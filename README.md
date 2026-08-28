@@ -169,7 +169,7 @@ four divergent snapshots. Full numbers in
 |---|---|---|---|
 | **v0** | Baseline. Show the model the task and the verifier, ask whether an incorrect solution could pass. Nothing executed. | 8/8 found, **7/7 false alarms**, balanced accuracy **0.50** | Established the starting point. Reproduces the published finding that reading a verifier is not enough. |
 | **v1** | Let the model write exploits, and **execute every one**. A claim only survives if it is reproduced. | False alarms collapse: nothing is asserted that was not run | Kept. Execution, not the model, is what removes false alarms. |
-| **v2** | Added the **gold sanity gate**: run the reference solution against its own verifier first. | Catches `t08_days_between`, whose verifier rejects its own reference solution. No attack can find this, because there is nothing to attack. | Kept. One environment class is only reachable this way. |
+| **v2** | Added the **gold sanity gate**: run the reference solution against its own verifier first. | **8/8 found, 0/7 false alarms, 26 model calls, 882s.** Catches `t08_days_between`, whose verifier rejects its own reference solution and which no attack can reach, because there is nothing there to exploit. | Kept. One environment class is only reachable this way, and it costs one execution. |
 | **v3** | Added **deterministic template attacks** generated from the function signature: constants, empty values of the right type, identity, and the literal the verifier compares against. | **8/8 found, 0/7 false alarms, balanced accuracy 1.00, in 7 seconds with zero model calls** | Kept. This is where essentially all the detection came from. |
 | **v4** | Added **model attacks on survivors only**, so inference runs exactly where cheap methods failed. | 8/8 found, 0/7 false alarms, **19 model calls and 660s**, versus v3's 0 calls and 7s. **+0 detections.** | **Demoted.** Kept in the codebase for environments templates cannot reach, but removed from the recommended configuration. The headline reports v3. |
 | **fix** | **Differential verification.** Removed the pipeline's trust in the attacker's own claim that a candidate was wrong. | Retracted a false `CONFIRMED_HACKABLE` on `t11_is_palindrome` without losing any true detection. Recorded in [`trajectories/01-attacker-retracted.md`](trajectories/01-attacker-retracted.md). | Kept. This is what makes a confirmed verdict trustworthy. |
@@ -182,16 +182,20 @@ both are measured rather than asserted:
    believed it. The lesson is that a generator cannot be its own judge; the
    retraction has to come from execution against a reference, not from a better
    prompt.
-2. **The model stage as the recommended path** (cut in the `v4` row). It cost 19
-   inference calls and 94x the wall clock to find **nothing** the deterministic
-   templates had not already found, and its one independent contribution was the
-   false positive above. The lesson is that attacker *creativity* was never the
-   bottleneck, so buying more of it bought nothing.
+2. **The model stage as the recommended path** (cut in the `v4` row). Not because
+   it failed. `v2` shows the model finds **8/8 unaided**, with real and
+   reproducible exploits. It was cut because it buys the *same* answer as the
+   templates at **126x the wall clock** (882s versus 7s). The lesson is not that
+   attacker creativity is useless; it is that creativity was never the binding
+   constraint on this corpus, so paying for it bought nothing you did not already
+   have for free.
 
-*Note on scope:* I did not run a parallel-attacker-persona experiment. Given that
-a single attacker already contributed zero net detections over templates, running
-three of them would have measured the same zero at three times the cost, so the
-budget went into differential verification instead.
+*Note on scope:* I did not run a parallel-attacker-persona experiment. A single
+attacker already reaches the ceiling on this corpus (8/8), so additional
+attackers have no headroom to demonstrate, and the budget went into differential
+verification instead. If the corpus contained defects a single attacker missed,
+that experiment would be worth running and this note would be an excuse rather
+than a reason.
 
 ### The iteration that mattered most, and it was not a feature
 
@@ -257,25 +261,47 @@ proof, and the report says so.
 
 ## Hot take
 
-**Execution was load-bearing. Intelligence was not.**
+**Execution was load-bearing. Intelligence was optional, and it was the expensive
+way to buy the same answer.**
 
-The deterministic stages, with **zero model calls**, scored a perfect 1.00
-balanced accuracy on this corpus in about seven seconds. The language model, the
-expensive and impressive part, added nothing on top of them, and its one
-independent contribution was a **false positive** that took a differential tester
-to retract.
+The tempting version of this finding is "the model was useless." That is not what
+the measurement says, and I nearly wrote it before running the experiment that
+disproved it.
+
+Given the same environments and no deterministic help at all, the local 8B model
+found **every single planted defect, 8 out of 8, with zero false alarms**. Its
+exploits are real and independently reproducible: for `top_k` it returned
+`[5, 9]` where the reference returns `[9, 5]`, beating the verifier by getting
+the *ordering* wrong. That is a genuinely subtle attack.
+
+So the model is not incompetent. It is **redundant**:
+
+| Configuration | Found | False alarms | Model calls | Wall clock |
+|---|---|---|---|---|
+| Model alone, no templates (`v2`) | 8/8 | 0/7 | 26 | 882s |
+| Templates alone, no model (`v3`) | 8/8 | 0/7 | **0** | **7s** |
+
+Identical accuracy. **126 times the wall clock.** And when both run together
+(`v4`), the model contributes nothing further, because the templates have already
+found everything, while still costing 19 calls and 94x the time.
 
 The industry framing of reward hacking is "models are getting clever enough to
-game our graders." What this build suggests is closer to the opposite: most
-graders are broken in mechanical, enumerable ways, and you find them by *trying
-things and running them*, not by reasoning about them. The best-performing
-configuration here is a for-loop over ten templates and a subprocess call.
+game our graders," which invites the response "so buy a cleverer auditor." The
+measurement points somewhere cheaper and less flattering: **most graders are
+broken in mechanical, enumerable ways.** A constant. An empty list. The literal
+the test compares against. You find those by trying them and running them, and a
+for-loop enumerates them faster than any model can reason its way to them.
 
-If that holds on real environments, the practical advice for a data lab is
-uncomfortable and cheap: **before you buy a smarter auditor, run the dumb attacks
-and actually execute them.** The naive LLM reviewer scored 0.50, the same as
-answering "yes" to everything. A hundred lines of deterministic Python scored
-1.00. The gap between them is not intelligence, it is whether anyone ran the code.
+The useful question for a data lab is therefore not *can the model do it*. It
+demonstrably can. The question is *is the model the cheapest thing that can*, and
+here it was not, by two orders of magnitude.
+
+One caveat I will not paper over: this corpus is small, synthetic, and its defect
+families are exactly the enumerable kind. On defects that are not enumerable, the
+ranking would likely invert, and the model stage is kept in the codebase for
+precisely that reason. What the evidence supports is narrower and more actionable
+than "skip the model": **run the cheap deterministic attacks first, and make the
+model earn the environments they could not crack.**
 
 ---
 
