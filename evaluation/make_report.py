@@ -31,12 +31,20 @@ def load_results() -> dict[str, dict]:
     return results
 
 
-def headline_table(results: dict) -> str:
-    """Baseline versus the full system, the comparison judges read first."""
-    if "v0" not in results or "v4" not in results:
-        return "_(needs both v0 and v4 results)_\n"
+# The configuration we actually recommend shipping. It is v3, not v4, because the
+# measurement showed the model stage adds no detections while multiplying wall
+# clock. Presenting v4 here would understate the system on a metric (speed) that
+# our own evidence says to drop the model for. v4 is still reported in full in
+# the changelog below, including the fact that it cost 94x for nothing.
+HEADLINE_VERSION = "v3"
 
-    base, full = results["v0"], results["v4"]
+
+def headline_table(results: dict) -> str:
+    """Baseline versus the recommended configuration, read first by judges."""
+    if "v0" not in results or HEADLINE_VERSION not in results:
+        return f"_(needs both v0 and {HEADLINE_VERSION} results)_\n"
+
+    base, full = results["v0"], results[HEADLINE_VERSION]
     bm, fm = base["metrics"], full["metrics"]
     broken = bm["true_positives"] + bm["false_negatives"]
     clean = bm["true_negatives"] + bm["false_positives"]
@@ -59,8 +67,18 @@ def headline_table(results: dict) -> str:
         ("Cost per environment", "$0.00", "$0.00", "$0.00"),
     ]
 
-    out = ["| Metric | Baseline (read only) | envguard | Change |", "|---|---|---|---|"]
+    out = [
+        f"| Metric | Baseline (reads the verifier) | envguard (`{HEADLINE_VERSION}`) | Change |",
+        "|---|---|---|---|",
+    ]
     out += [f"| {a} | {b} | {c} | {d} |" for a, b, c, d in rows]
+    out.append("")
+    out.append(
+        f"\n`{HEADLINE_VERSION}` is the recommended configuration rather than the "
+        "full `v4` pipeline, because the measurement below showed the model stage "
+        "adds no detections while multiplying wall clock. `v4` is reported in full "
+        "in the changelog, including that cost.\n"
+    )
     return "\n".join(out) + "\n"
 
 
