@@ -29,11 +29,17 @@ to cheat, and paying for the privilege. Published 2026 measurements:
 |---|---|
 | **28.5%** of SWE-bench Verified tasks accept a container-verified *incorrect* patch | [arXiv 2606.16062](https://arxiv.org/html/2606.16062v1) |
 | **25.0%** on R2E-Gym across six repositories | same |
-| **59.4%** of failed tasks have flawed tests (OpenAI, Feb 2026) | same |
-| An LLM judge reading the test file misses **61.9%** of defects that executing the code catches | same |
+| **59.4%** of failed tasks have flawed tests (OpenAI, Feb 2026) | reported in the same work |
+| A gold-sanity gate that *executes* code caught **61.9%** of test defects that an LLM judge alone missed | [arXiv 2606.16062](https://arxiv.org/html/2606.16062v1) |
 
 Roughly one environment in four is quietly broken, and reading the file is not
 enough to tell.
+
+That last row is why this project exists, and it is also the prediction this
+project set out to test on its own corpus. The result was stronger than the
+paper's: our read-only baseline did not miss 61.9% of defects, it misclassified
+**every sound environment in the corpus**, scoring exactly what a function that
+always answers "hackable" would score.
 
 **Why it is worth solving now.** On 18 August 2026 micro1's CEO stated the
 company had committed **over $20,000,000 in 11 days** to license real operational
@@ -165,9 +171,27 @@ four divergent snapshots. Full numbers in
 | **v1** | Let the model write exploits, and **execute every one**. A claim only survives if it is reproduced. | False alarms collapse: nothing is asserted that was not run | Kept. Execution, not the model, is what removes false alarms. |
 | **v2** | Added the **gold sanity gate**: run the reference solution against its own verifier first. | Catches `t08_days_between`, whose verifier rejects its own reference solution. No attack can find this, because there is nothing to attack. | Kept. One environment class is only reachable this way. |
 | **v3** | Added **deterministic template attacks** generated from the function signature: constants, empty values of the right type, identity, and the literal the verifier compares against. | **8/8 found, 0/7 false alarms, balanced accuracy 1.00, in 7 seconds with zero model calls** | Kept. This is where essentially all the detection came from. |
-| **v4** | Added **model attacks on survivors only**, so inference runs exactly where cheap methods failed. | See `results.md`. On this corpus the deterministic stages had already found everything. | Kept for coverage on environments the templates cannot reach, but it is not what makes the system work. |
-| **fix** | **Differential verification.** Discovered mid-build that v4 was confirming a false positive. See below. | Restored `t11_is_palindrome` to a correct `CLEAN` verdict without losing any true detection | Kept. This is what makes a confirmed verdict trustworthy. |
-| **removed** | Multiple parallel attacker personas. | Tripled inference for no additional detection on this corpus, because the templates had already found everything the personas could. | **Removed.** Diversity of attackers is worthless when the bottleneck is not attacker creativity. |
+| **v4** | Added **model attacks on survivors only**, so inference runs exactly where cheap methods failed. | 8/8 found, 0/7 false alarms, **19 model calls and 660s**, versus v3's 0 calls and 7s. **+0 detections.** | **Demoted.** Kept in the codebase for environments templates cannot reach, but removed from the recommended configuration. The headline reports v3. |
+| **fix** | **Differential verification.** Removed the pipeline's trust in the attacker's own claim that a candidate was wrong. | Retracted a false `CONFIRMED_HACKABLE` on `t11_is_palindrome` without losing any true detection. Recorded in [`trajectories/01-attacker-retracted.md`](trajectories/01-attacker-retracted.md). | Kept. This is what makes a confirmed verdict trustworthy. |
+
+**What was removed, and what it taught me.** Two things were tried and cut, and
+both are measured rather than asserted:
+
+1. **Trusting the model's self-assessment** (cut in the `fix` row above). The
+   attacker declared a correct implementation to be an exploit and the pipeline
+   believed it. The lesson is that a generator cannot be its own judge; the
+   retraction has to come from execution against a reference, not from a better
+   prompt.
+2. **The model stage as the recommended path** (cut in the `v4` row). It cost 19
+   inference calls and 94x the wall clock to find **nothing** the deterministic
+   templates had not already found, and its one independent contribution was the
+   false positive above. The lesson is that attacker *creativity* was never the
+   bottleneck, so buying more of it bought nothing.
+
+*Note on scope:* I did not run a parallel-attacker-persona experiment. Given that
+a single attacker already contributed zero net detections over templates, running
+three of them would have measured the same zero at three times the cost, so the
+budget went into differential verification instead.
 
 ### The iteration that mattered most, and it was not a feature
 
