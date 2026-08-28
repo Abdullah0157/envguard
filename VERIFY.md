@@ -38,7 +38,8 @@ planted defect and falsely accuses nothing, without calling a language model.
 | 2 | The answer key is correct, not just asserted | `python3 evaluation/check_corpus.py` | Anything other than `RESULT: PASS`. It executes every task to prove broken ones are beatable and sound ones are not. |
 | 3 | The baseline scores 0.50, same as always saying yes | `python3 evaluation/run_eval.py --version v0` | A balanced accuracy meaningfully above 0.50. |
 | 4 | envguard scores 1.00 with zero model calls | `python3 evaluation/run_eval.py --version v3` | Fewer than 8/8 found, or any false alarm, or a nonzero model call count. |
-| 5 | The model adds nothing over templates | `python3 evaluation/run_eval.py --version v4` then compare to v3 | v4 finding a defect that v3 missed. |
+| 5 | Adding the model *on top of* templates yields +0 detections | `python3 evaluation/run_eval.py --version v4`, compare to v3 | v4 finding a defect that v3 missed. |
+| 5b | The model is redundant, **not** incapable: it finds 8/8 unaided, just 126x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring below 8/8, which would mean the README oversells the model rather than the templates. |
 | 6 | All 7 baseline claims about sound environments are false | `python3 evaluation/refutations.py` | Any row reading "passes (claim holds)". |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
