@@ -330,6 +330,21 @@ python3 evaluation/run_eval.py --version v3   # perfect score, 7s, no model call
 No API key. No `pip install`. No virtual environment. Standard library plus a
 local Ollama server.
 
+## Do not trust this README
+
+Every claim here is checkable, and [`VERIFY.md`](VERIFY.md) pairs each one with
+the command that would **disprove** it if it were false. It also shows how to
+attack the setup itself: whether the baseline was made deliberately weak, whether
+the corpus was rigged so the templates trivially win, whether the "broken"
+environments really are broken, and whether any number in the prose was typed by
+hand rather than generated.
+
+Start here if you are evaluating this project:
+
+```bash
+python3 evaluation/run_eval.py --version v3   # ~7s, no model needed
+```
+
 ## Reproducibility, verified rather than claimed
 
 This repository was cloned fresh from GitHub into an empty directory, and every

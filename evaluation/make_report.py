@@ -16,6 +16,7 @@ import argparse
 import glob
 import json
 import os
+import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_DIR = os.path.join(ROOT, "evaluation", "results")
@@ -163,12 +164,15 @@ def main() -> int:
     args = parser.parse_args()
 
     text = render()
-    print(text)
+    # end="" so stdout is byte-identical to the written file. VERIFY.md tells the
+    # reader to `diff` one against the other as a check that the prose tables were
+    # not hand-edited, and a stray trailing newline would fail that check.
+    print(text, end="")
     if args.write:
         path = os.path.join(ROOT, "evaluation", "results.md")
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(text)
-        print(f"wrote {os.path.relpath(path, ROOT)}")
+        print(f"\nwrote {os.path.relpath(path, ROOT)}", file=sys.stderr)
     return 0
 
 
