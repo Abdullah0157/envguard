@@ -7,6 +7,7 @@
 #   ./run.sh compare    baseline vs envguard, then regenerate the report tables
 #   ./run.sh all        every changelog version, start to finish
 #   ./run.sh demo       show one broken environment being cheated, end to end
+#   ./run.sh archive    build a submission archive from the committed tree
 #
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -92,11 +93,35 @@ print(f"\n{report.attacks_executed} candidates executed in {report.duration_s}s,
 PY
 }
 
+cmd_archive() {
+  banner "building submission archive"
+  # git archive exports exactly the committed tree: no .git, no __pycache__, no
+  # local scratch files. What a judge unzips is byte-identical to what the
+  # repository contains at this commit, which is the point.
+  if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+    echo "  WARNING: uncommitted changes exist; they will NOT be in the archive." >&2
+    echo "  Commit first if you want them included." >&2
+  fi
+  local sha name out
+  sha=$(git rev-parse --short HEAD)
+  name="envguard-${sha}"
+  out="../${name}.zip"
+  git archive --format=zip --prefix="${name}/" -o "$out" HEAD
+  echo "  wrote $(cd .. && pwd)/${name}.zip"
+  echo "  commit:  ${sha}"
+  echo "  files:   $(git ls-tree -r --name-only HEAD | wc -l | tr -d ' ')"
+  echo "  size:    $(cd .. && du -h "${name}.zip" | cut -f1)"
+  echo
+  echo "  verify the archive matches the repository:"
+  echo "    unzip -l $(cd .. && pwd)/${name}.zip | tail -3"
+}
+
 case "${1:-fast}" in
   verify)  cmd_verify ;;
   fast)    cmd_fast ;;
   compare) cmd_compare ;;
   all)     cmd_all ;;
   demo)    cmd_demo ;;
-  *) echo "usage: $0 {verify|fast|compare|all|demo}" >&2; exit 1 ;;
+  archive) cmd_archive ;;
+  *) echo "usage: $0 {verify|fast|compare|all|demo|archive}" >&2; exit 1 ;;
 esac

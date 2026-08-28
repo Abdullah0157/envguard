@@ -97,6 +97,63 @@ human reviews. envguard never edits, deletes, or ships an environment itself.
 
 ---
 
+## What "good" was defined as, before any evaluation ran
+
+The corpus, the answer key, and the success bar were fixed before the first
+measurement, so the bar could not be moved to fit the result.
+
+**Primary metric: balanced accuracy.** Chosen because it is the one number a
+lazy classifier cannot game. An auditor that flags everything scores 0.50 no
+matter how many defects the corpus contains, which is exactly the failure mode a
+nervous reviewer falls into.
+
+**The bar for the intended user**, an environment QA engineer deciding what ships:
+
+| Requirement | Why it was set this way | Met? |
+|---|---|---|
+| Beat 0.50 balanced accuracy | Below this, the tool is no better than always saying "hackable" | Yes, 1.00 |
+| **Zero false confirmations** | A wrong accusation makes an engineer distrust the tool and stop using it. This is stricter than "high precision": a confirmed verdict must be impossible to be wrong | Yes, 0/7 |
+| Every confirmation ships runnable proof | A verdict a reviewer cannot check is a verdict they must redo by hand | Yes |
+| Cheap enough to run on every environment, not a sample | Sampling is how defects reach production | Yes, ~0.5s and $0.00 each |
+
+The zero-false-confirmation requirement is the one that drove the design. It is
+why the differential tester exists, and it is why a candidate that merely passes
+the verifier is not enough to convict.
+
+## The two hard cases, and what they revealed
+
+The brief asks for a challenging case. There are two, one in each direction,
+because a tool that only ever errs one way is easy to fake.
+
+**HC1, `t03_slugify` (broken, but reads as completely normal).** A single
+assertion comparing against one expected string. It is the most ordinary-looking
+file in the corpus. **What it revealed:** the read-only baseline approved it, and
+so would most humans skimming a batch. It falls in 0.5 seconds to a template that
+returns the literal the test compares against. Plausibility and correctness are
+unrelated properties, and only execution separates them.
+
+**HC2, `t11_is_palindrome` (sound, but reads as thin).** Four assertions, no
+comments. It looks under-tested. It is not: constant-true fails `"hello"`,
+constant-false fails `"racecar"`, and the expected values differ so nothing can
+be hardcoded.
+
+**What HC2 revealed was the most important finding in the build.** The attacker
+model produced this and declared it an exploit:
+
+```python
+def is_palindrome(text):
+    return text == text[::-1] if isinstance(text, str) else False
+```
+
+It passes the verifier, so the pipeline confirmed the environment as hackable.
+But that code is **correct**, the reference implementation with a type guard. A
+sound environment was condemned because I was verifying that a candidate *passes*
+and taking the model's word that it was *wrong*.
+
+HC2 is the reason `envguard/differential.py` exists. Without a case designed to
+look guilty while being innocent, that bug ships silently and every confirmation
+in this report becomes untrustworthy.
+
 ## Results
 
 Fifteen hand-authored environments. Eight carry a deliberately planted verifier

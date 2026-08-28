@@ -20,6 +20,7 @@ python3 trajectories/capture.py
 |---|---|---|---|
 | **Attacker** | `envguard/auditor.py` (`ATTACKER_SYSTEM`) | Write a solution that is wrong for the task but still passes the verifier | sandbox execution, harness-bypass canary, differential tester |
 | **Baseline judge** | `baseline/baseline.py` (`SYSTEM_PROMPT`) | Read the task and verifier, decide whether an incorrect solution could pass | none, by design |
+| **Coding agent** | Claude Code, model Claude Opus 5 | Built this repository | shell, file editing, the project's own test suites |
 
 Both prompts are committed in full and are quoted verbatim inside the
 trajectories, so nothing about how the agents were steered is hidden.
@@ -38,6 +39,7 @@ misrepresent the system.
 | [`01-attacker-retracted.md`](01-attacker-retracted.md) | **The most instructive run.** The attacker produces a program that passes the verifier and claims it is an exploit. Execution disagrees, the claim is retracted, and the environment is correctly declared sound. Shows retries, feedback between attempts, and the checkpoint that protects a human from a false accusation. |
 | [`02-template-confirmed.md`](02-template-confirmed.md) | A confirmed defect found with no inference at all. The verifier reads like an ordinary test and the read-only baseline approved it; a deterministic template beats it in under a second, and differential testing proves the exploit is genuinely wrong. |
 | [`03-sanity-gate.md`](03-sanity-gate.md) | An environment that no attacker could ever flag, because its verifier rejects its own reference solution. Only running the reference first reveals it. This is the evidence that justifies stage one of the pipeline. |
+| [`04-coding-agent.md`](04-coding-agent.md) | **The coding agent that built this repository.** Five checkpoints where a tool response or a committed artefact contradicted the agent and changed the design: the harness bypass, a wrong answer key, a false confirmation, a fabricated measurement, and a conclusion that its own later data reversed. |
 
 ---
 
