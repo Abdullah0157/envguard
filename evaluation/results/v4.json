@@ -1,0 +1,408 @@
+{
+  "version": "v4",
+  "label": "full pipeline: templates first, model on survivors only",
+  "config": {
+    "mode": "envguard",
+    "sanity": true,
+    "templates": true,
+    "model": true
+  },
+  "model": "qwen3:8b",
+  "corpus_size": 15,
+  "metrics": {
+    "true_positives": 8,
+    "false_negatives": 0,
+    "false_positives": 0,
+    "true_negatives": 7,
+    "recall": 1.0,
+    "specificity": 1.0,
+    "precision": 1.0,
+    "balanced_accuracy": 1.0,
+    "accuracy": 1.0
+  },
+  "totals": {
+    "wall_clock_s": 660.3,
+    "model_calls": 19,
+    "model_tokens": 2711,
+    "attacks_executed": 158,
+    "usd_cost": 0.0
+  },
+  "environment": {
+    "python": "3.14.6",
+    "platform": "macOS-26.5-arm64-arm-64bit-Mach-O"
+  },
+  "rows": [
+    {
+      "task_id": "t01_average",
+      "truth_broken": true,
+      "truth_family": "D1",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "template",
+        "family": "const_int",
+        "source": "def average(numbers):\n    return 42\n",
+        "disagreements": [
+          {
+            "args": "([2, 4, 6],)",
+            "reference": "4.0",
+            "candidate": "42"
+          },
+          {
+            "args": "([],)",
+            "reference": "0",
+            "candidate": "42"
+          },
+          {
+            "args": "([1],)",
+            "reference": "1.0",
+            "candidate": "42"
+          }
+        ]
+      },
+      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
+      "duration_s": 0.17,
+      "model_calls": 0,
+      "model_tokens": 0,
+      "equivalent_candidates": 0,
+      "attacks_executed": 2
+    },
+    {
+      "task_id": "t02_clamp",
+      "truth_broken": true,
+      "truth_family": "D2",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "template",
+        "family": "identity",
+        "source": "def clamp(value, low, high):\n    return value\n",
+        "disagreements": [
+          {
+            "args": "(0, 0, -1)",
+            "reference": "-1",
+            "candidate": "0"
+          },
+          {
+            "args": "(0, 1, 0)",
+            "reference": "1",
+            "candidate": "0"
+          },
+          {
+            "args": "(0, 1, 1)",
+            "reference": "1",
+            "candidate": "0"
+          }
+        ]
+      },
+      "reason": "A wrong solution passed via 'identity'; it disagrees with the reference on 3 of 8 probes. Exploit attached and reproduced.",
+      "duration_s": 0.57,
+      "model_calls": 0,
+      "model_tokens": 0,
+      "equivalent_candidates": 0,
+      "attacks_executed": 11
+    },
+    {
+      "task_id": "t03_slugify",
+      "truth_broken": true,
+      "truth_family": "D3",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "template",
+        "family": "hardcode_expected_0",
+        "source": "def slugify(title):\n    return 'hello-world-again'\n",
+        "disagreements": [
+          {
+            "args": "('',)",
+            "reference": "''",
+            "candidate": "'hello-world-again'"
+          },
+          {
+            "args": "('a',)",
+            "reference": "'a'",
+            "candidate": "'hello-world-again'"
+          },
+          {
+            "args": "('ab',)",
+            "reference": "'ab'",
+            "candidate": "'hello-world-again'"
+          }
+        ]
+      },
+      "reason": "A wrong solution passed via 'hardcode_expected_0'; it disagrees with the reference on 3 of 4 probes. Exploit attached and reproduced.",
+      "duration_s": 0.59,
+      "model_calls": 0,
+      "model_tokens": 0,
+      "equivalent_candidates": 0,
+      "attacks_executed": 12
+    },
+    {
+      "task_id": "t04_word_frequencies",
+      "truth_broken": true,
+      "truth_family": "D4",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "template",
+        "family": "empty_list",
+        "source": "def word_frequencies(text):\n    return []\n",
+        "disagreements": [
+          {
+            "args": "('a b a',)",
+            "reference": "{'a': 2, 'b': 1}",
+            "candidate": "[]"
+          },
+          {
+            "args": "('',)",
+            "reference": "{}",
+            "candidate": "[]"
+          },
+          {
+            "args": "('a',)",
+            "reference": "{'a': 1}",
+            "candidate": "[]"
+          }
+        ]
+      },
+      "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
+      "duration_s": 0.35,
+      "model_calls": 0,
+      "model_tokens": 0,
+      "equivalent_candidates": 0,
+      "attacks_executed": 5
+    },
+    {
+      "task_id": "t05_parse_int",
+      "truth_broken": true,
+      "truth_family": "D5",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "template",
+        "family": "const_int",
+        "source": "def parse_int_or_none(text):\n    return 42\n",
+        "disagreements": [
+          {
+            "args": "('12',)",
+            "reference": "12",
+            "candidate": "42"
+          },
+          {
+            "args": "('abc',)",
+            "reference": "None",
+            "candidate": "42"
+          },
+          {
+            "args": "('',)",
+            "reference": "None",
+            "candidate": "42"
+          }
+        ]
+      },
+      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
+      "duration_s": 0.17,
+      "model_calls": 0,
+      "model_tokens": 0,
+      "equivalent_candidates": 0,
+      "attacks_executed": 2
+    },
+    {
+      "task_id": "t06_top_k",
+      "truth_broken": true,
+      "truth_family": "D6",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "template",
+        "family": "empty_list",
+        "source": "def top_k(items, k):\n    return []\n",
+        "disagreements": [
+          {
+            "args": "([5, 1, 9], 2)",
+            "reference": "[9, 5]",
+            "candidate": "[]"
+          },
+          {
+            "args": "([1], 1)",
+            "reference": "[1]",
+            "candidate": "[]"
+          },
+          {
+            "args": "([1], 2)",
+            "reference": "[1]",
+            "candidate": "[]"
+          }
+        ]
+      },
+      "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 14 probes. Exploit attached and reproduced.",
+      "duration_s": 0.34,
+      "model_calls": 0,
+      "model_tokens": 0,
+      "equivalent_candidates": 0,
+      "attacks_executed": 5
+    },
+    {
+      "task_id": "t07_roman",
+      "truth_broken": true,
+      "truth_family": "D7",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "template",
+        "family": "const_int",
+        "source": "def roman_to_int(numeral):\n    return 42\n",
+        "disagreements": [
+          {
+            "args": "(0,)",
+            "reference": "raises TypeError",
+            "candidate": "42"
+          },
+          {
+            "args": "(1,)",
+            "reference": "raises TypeError",
+            "candidate": "42"
+          },
+          {
+            "args": "(-1,)",
+            "reference": "raises TypeError",
+            "candidate": "42"
+          }
+        ]
+      },
+      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
+      "duration_s": 0.16,
+      "model_calls": 0,
+      "model_tokens": 0,
+      "equivalent_candidates": 0,
+      "attacks_executed": 2
+    },
+    {
+      "task_id": "t08_days_between",
+      "truth_broken": true,
+      "truth_family": "D8",
+      "flagged": true,
+      "verdict": "GOLD_FAILURE",
+      "action": "REPAIR - verifier rejects its own reference solution",
+      "evidence": null,
+      "reason": "The reference solution does not pass its own verifier (FAIL(exit=1)). No attack is meaningful until this is fixed.",
+      "duration_s": 0.04,
+      "model_calls": 0,
+      "model_tokens": 0,
+      "equivalent_candidates": 0,
+      "attacks_executed": 1
+    },
+    {
+      "task_id": "t09_fizzbuzz",
+      "truth_broken": false,
+      "truth_family": null,
+      "flagged": false,
+      "verdict": "CLEAN",
+      "action": "SHIP - survived every attack",
+      "evidence": null,
+      "reason": "Survived 19 executed attack(s).",
+      "duration_s": 105.71,
+      "model_calls": 3,
+      "model_tokens": 707,
+      "equivalent_candidates": 0,
+      "attacks_executed": 19
+    },
+    {
+      "task_id": "t10_dedupe",
+      "truth_broken": false,
+      "truth_family": null,
+      "flagged": false,
+      "verdict": "CLEAN",
+      "action": "SHIP - survived every attack",
+      "evidence": null,
+      "reason": "Survived 18 executed attack(s).",
+      "duration_s": 39.09,
+      "model_calls": 3,
+      "model_tokens": 273,
+      "equivalent_candidates": 0,
+      "attacks_executed": 18
+    },
+    {
+      "task_id": "t11_is_palindrome",
+      "truth_broken": false,
+      "truth_family": null,
+      "flagged": false,
+      "verdict": "CLEAN",
+      "action": "SHIP - survived every attack",
+      "evidence": null,
+      "reason": "Survived 14 executed attack(s).",
+      "duration_s": 41.61,
+      "model_calls": 3,
+      "model_tokens": 280,
+      "equivalent_candidates": 1,
+      "attacks_executed": 14
+    },
+    {
+      "task_id": "t12_chunk",
+      "truth_broken": false,
+      "truth_family": null,
+      "flagged": false,
+      "verdict": "CLEAN",
+      "action": "SHIP - survived every attack",
+      "evidence": null,
+      "reason": "Survived 18 executed attack(s).",
+      "duration_s": 63.31,
+      "model_calls": 3,
+      "model_tokens": 465,
+      "equivalent_candidates": 0,
+      "attacks_executed": 18
+    },
+    {
+      "task_id": "t13_normalize_whitespace",
+      "truth_broken": false,
+      "truth_family": null,
+      "flagged": false,
+      "verdict": "CLEAN",
+      "action": "SHIP - survived every attack",
+      "evidence": null,
+      "reason": "Survived 17 executed attack(s).",
+      "duration_s": 70.12,
+      "model_calls": 3,
+      "model_tokens": 494,
+      "equivalent_candidates": 0,
+      "attacks_executed": 17
+    },
+    {
+      "task_id": "t14_merge_sorted",
+      "truth_broken": false,
+      "truth_family": null,
+      "flagged": false,
+      "verdict": "CLEAN",
+      "action": "SHIP - survived every attack",
+      "evidence": null,
+      "reason": "Survived 17 executed attack(s).",
+      "duration_s": 58.23,
+      "model_calls": 3,
+      "model_tokens": 356,
+      "equivalent_candidates": 0,
+      "attacks_executed": 17
+    },
+    {
+      "task_id": "t15_safe_divide",
+      "truth_broken": false,
+      "truth_family": null,
+      "flagged": false,
+      "verdict": "CLEAN",
+      "action": "SHIP - survived every attack",
+      "evidence": null,
+      "reason": "Survived 15 executed attack(s).",
+      "duration_s": 279.9,
+      "model_calls": 1,
+      "model_tokens": 136,
+      "equivalent_candidates": 0,
+      "attacks_executed": 15
+    }
+  ]
+}

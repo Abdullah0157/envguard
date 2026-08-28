@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+#
+# envguard: one-command entry point.
+#
+#   ./run.sh verify     prove the machinery works (no model needed for 2 of 3)
+#   ./run.sh fast       audit all 15 environments deterministically (~7s, no model)
+#   ./run.sh compare    baseline vs envguard, then regenerate the report tables
+#   ./run.sh all        every changelog version, start to finish
+#   ./run.sh demo       show one broken environment being cheated, end to end
+#
+set -euo pipefail
+cd "$(dirname "$0")"
+
+PY="${PYTHON:-python3}"
+MODEL="${ENVGUARD_MODEL:-qwen3:8b}"
+
+banner() { printf '\n\033[1m== %s ==\033[0m\n' "$1"; }
+
+need_ollama() {
+  if ! curl -fsS -m 5 http://localhost:11434/api/tags >/dev/null 2>&1; then
+    echo "ERROR: no Ollama server on :11434. Start it with:  ollama serve" >&2
+    exit 2
+  fi
+  if ! curl -fsS -m 5 http://localhost:11434/api/tags | grep -q "$MODEL"; then
+    echo "ERROR: model $MODEL not installed. Run:  ollama pull $MODEL" >&2
+    exit 2
+  fi
+}
+
+cmd_verify() {
+  banner "sandbox isolation and edge cases"
+  "$PY" envguard/sandbox.py
+  banner "corpus answer key, proven by execution"
+  "$PY" evaluation/check_corpus.py
+  banner "model client"
+  need_ollama
+  "$PY" envguard/llm.py
+}
+
+cmd_fast() {
+  banner "deterministic audit of all 15 environments (no model calls)"
+  "$PY" -u evaluation/run_eval.py --version v3
+}
+
+cmd_compare() {
+  need_ollama
+  banner "baseline: read the verifier, execute nothing"
+  "$PY" -u evaluation/run_eval.py --version v0
+  banner "envguard: full pipeline"
+  "$PY" -u evaluation/run_eval.py --version v4
+  banner "reports"
+  "$PY" evaluation/make_report.py --write >/dev/null
+  "$PY" evaluation/refutations.py --write >/dev/null
+  echo "wrote evaluation/results.md and evaluation/refutations.md"
+}
+
+cmd_all() {
+  need_ollama
+  for version in v0 v1 v2 v3 v4; do
+    banner "$version"
+    "$PY" -u evaluation/run_eval.py --version "$version"
+  done
+  "$PY" evaluation/make_report.py --write >/dev/null
+  "$PY" evaluation/refutations.py --write >/dev/null
+}
+
+cmd_demo() {
+  banner "one environment, cheated end to end"
+  "$PY" - <<'PY'
+import sys, os
+sys.path.insert(0, "envguard")
+from corpus import load_tasks
+from auditor import audit
+
+task = [t for t in load_tasks() if t.id == "t03_slugify"][0]
+print("TASK\n----")
+print(task.statement.strip())
+print("\nVERIFIER\n--------")
+print(task.verifier_src.strip())
+print("\nThis reads like a perfectly ordinary test. Auditing it...\n")
+
+report = audit(task, use_model=False)
+print(f"VERDICT: {report.verdict}")
+print(f"ACTION : {report.action}")
+if report.evidence:
+    print("\nEXPLOIT (wrong, yet accepted)\n----------------------------")
+    print(report.evidence.source.strip())
+    print("\nWHY IT IS ACTUALLY WRONG (executed side by side with the reference)")
+    for d in report.evidence.disagreements[:3]:
+        print(f"  args={d['args']}  reference={d['reference']}  exploit={d['candidate']}")
+print(f"\n{report.attacks_executed} candidates executed in {report.duration_s}s, 0 model calls, $0.00")
+PY
+}
+
+case "${1:-fast}" in
+  verify)  cmd_verify ;;
+  fast)    cmd_fast ;;
+  compare) cmd_compare ;;
+  all)     cmd_all ;;
+  demo)    cmd_demo ;;
+  *) echo "usage: $0 {verify|fast|compare|all|demo}" >&2; exit 1 ;;
+esac
