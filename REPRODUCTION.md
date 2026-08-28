@@ -2,6 +2,13 @@
 
 Written for someone starting from a clean machine with nothing installed.
 
+> **This guide has been tested by following it literally.** The repository was
+> cloned fresh from GitHub into an empty directory and every command below was
+> run in order. All three verification steps passed, and `v3` reproduced the
+> published result exactly: identical confusion matrix, identical rates, and
+> identical verdicts on all 15 environments. See "Verified reproduction" at the
+> end of this document.
+
 There is **no API key, no billing account, and no `pip install` anywhere in this
 guide**. Everything runs locally and offline after the model is pulled once.
 Total cost to reproduce every number in this repository: **$0.00**.
@@ -61,8 +68,8 @@ export ENVGUARD_MODEL=qwen3:4b     # optional
 ## 3. Get the code
 
 ```bash
-git clone <repository-url> micro1-env-auditor
-cd micro1-env-auditor
+git clone https://github.com/Abdullah0157/envguard.git
+cd envguard
 ```
 
 ## 4. Verify the machinery before trusting any number
@@ -163,3 +170,40 @@ distribution.
 | `llm self-test` fails on JSON | model emitting reasoning blocks | ensure `think: false`; already set in `envguard/llm.py` |
 | Very slow model stages | 8B model on a small machine | `export ENVGUARD_MODEL=qwen3:4b` |
 | `sandbox self-test` fails | non-POSIX platform | resource limits are POSIX only; the timeout still applies |
+
+---
+
+## Verified reproduction
+
+This is not a claim that the guide *should* work. It was executed.
+
+**Method.** A fresh `git clone` of this repository into an empty directory on a
+machine that had never run it, then every command in sections 4 and 5 above, in
+order, with no edits and no steps skipped.
+
+**Result.**
+
+| Step | Command | Outcome |
+|---|---|---|
+| 4a | `python3 envguard/sandbox.py` | `sandbox self-test: PASS` (22 checks) |
+| 4b | `python3 evaluation/check_corpus.py` | `RESULT: PASS - answer key is sound` |
+| 4c | `python3 envguard/llm.py` | `llm self-test: PASS`, model-written exploit executed and confirmed |
+| 5 | `python3 evaluation/run_eval.py --version v3` | 8/8 found, 0/7 false alarms, balanced accuracy 1.00, 6.5s |
+
+**Numbers matched the published run exactly.** Every field of the confusion
+matrix, every derived rate, and the verdict on all 15 environments were
+identical between the fresh clone and the committed `evaluation/results/v3.json`:
+
+```
+[ok] true_positives     8      [ok] recall             1.00
+[ok] false_positives    0      [ok] specificity        1.00
+[ok] true_negatives     7      [ok] precision          1.00
+[ok] false_negatives    0      [ok] balanced_accuracy  1.00
+[ok] all 15 per-task verdicts identical
+```
+
+The deterministic path carries no dependency on wall-clock time, randomness, or
+network access, which is why it reproduces byte for byte. The optional model
+stages are reproducible in distribution rather than exactly, because local
+inference varies with hardware and Ollama version; this is stated in section 8
+and is why the headline result is drawn from the deterministic path.

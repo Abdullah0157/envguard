@@ -296,11 +296,32 @@ trajectories/            annotated agent runs
 ## Quick start
 
 ```bash
+git clone https://github.com/Abdullah0157/envguard.git && cd envguard
 ollama pull qwen3:8b
-python3 envguard/sandbox.py          # 22 isolation checks
-python3 evaluation/check_corpus.py   # prove the answer key
+python3 envguard/sandbox.py                   # 22 isolation checks
+python3 evaluation/check_corpus.py            # prove the answer key
 python3 evaluation/run_eval.py --version v3   # perfect score, 7s, no model calls
 ```
 
-Full instructions, including runtimes and troubleshooting, in
-[`REPRODUCTION.md`](REPRODUCTION.md).
+No API key. No `pip install`. No virtual environment. Standard library plus a
+local Ollama server.
+
+## Reproducibility, verified rather than claimed
+
+This repository was cloned fresh from GitHub into an empty directory, and every
+command in [`REPRODUCTION.md`](REPRODUCTION.md) was run in order with nothing
+skipped. All three verification steps passed, and `v3` reproduced the published
+result **exactly**: identical confusion matrix, identical rates, and identical
+verdicts on all 15 environments.
+
+```
+[ok] true_positives   8    [ok] recall            1.00
+[ok] false_positives  0    [ok] specificity       1.00
+[ok] true_negatives   7    [ok] precision         1.00
+[ok] false_negatives  0    [ok] balanced_accuracy 1.00
+[ok] all 15 per-task verdicts identical
+```
+
+The deterministic path depends on no wall clock, no randomness, and no network,
+which is why it reproduces byte for byte. Full method and output under
+"Verified reproduction" in [`REPRODUCTION.md`](REPRODUCTION.md).
