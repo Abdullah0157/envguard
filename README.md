@@ -373,9 +373,37 @@ Nothing. This repository was written from scratch during the challenge window.
 - Third-party dependencies: none. Standard library only, plus a local Ollama
   server for inference.
 
-Coding agent used: **Claude Code** (Claude Opus 5). Representative trajectories
-are in [`trajectories/`](trajectories/), including the session where the
-false-positive bug was found and fixed.
+### Disclosure of agent use
+
+**Tool: Claude Code, model Claude Opus 5.** Coding-agent use is required by this
+challenge, so this is stated in full rather than minimised.
+
+Claude Code was used across the whole project, not only for writing code:
+
+| Stage | Agent's role | Human's role |
+|---|---|---|
+| Problem selection | Researched micro1's current products, funding and public statements; proposed five candidate problems with tradeoffs | Chose this one, rejected the other four |
+| Corpus design | Authored the 15 environments and the defect taxonomy | Set the constraint that the answer key had to be provable |
+| Implementation | Wrote all code in `envguard/`, `baseline/`, `evaluation/` | Directed scope, demanded edge-case coverage |
+| Evaluation | Ran every configuration, generated all tables | Required independent verification of every claim |
+| Documentation | Wrote README, REPRODUCTION, VERIFY, trajectories | Reviewed and ran the checks |
+
+The external research that anchors the problem statement is cited inline: the
+28.5% and 61.9% figures come from [arXiv 2606.16062](https://arxiv.org/html/2606.16062v1),
+and the $20M/11-days figure is a public statement by micro1's CEO dated
+18 August 2026.
+
+**What the agent got wrong.** Four claims in earlier drafts were false and were
+caught and corrected before submission: a fabricated experiment result, a
+paraphrased citation that overstated its source, a headline that contradicted the
+project's own generated tables, and a conclusion that a later measurement
+reversed. Each correction is a separate commit with its reasoning in the message,
+and the sequence is documented in
+[`trajectories/04-coding-agent.md`](trajectories/04-coding-agent.md).
+
+That record is included deliberately. A submission produced with an agent and
+presented as flawless would be less trustworthy than one that shows where the
+agent was wrong and what caught it.
 
 ---
 
