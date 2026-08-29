@@ -17,20 +17,28 @@ Total cost to reproduce every number in this repository: **$0.00**.
 
 ## 1. Prerequisites
 
-| Requirement | Version used | Notes |
+**To reproduce the headline result you need Python 3 and nothing else.**
+
+The recommended configuration (`v3`) makes zero inference calls, so it needs no
+model, no download, no API key, and no network. If you only want to check the
+main claim, skip straight to section 5.
+
+| Requirement | Needed for | Version used |
 |---|---|---|
-| Python | 3.14.6 | Standard library only. Any Python 3.10+ works; nothing to install. |
-| Ollama | 0.32.6 | Runs the local model. https://ollama.com/download |
-| Disk | ~6 GB | For the model weights. |
-| RAM | 16 GB | Measured on an Apple M1 with 16 GB. 8 GB is enough for `qwen3:4b`. |
+| **Python 3.10+** | **Everything. This is the only hard requirement.** | 3.14.6 |
+| Ollama | Only the optional model stages (`v0`, `v1`, `v2`, `v4`) | 0.32.6 |
+| ~6 GB disk | Only the model weights, if you run those stages | - |
+| 16 GB RAM | Only the model stages. 8 GB is fine with `qwen3:4b` | - |
 
 There are no Python dependencies. There is no virtual environment. There is no
 `requirements.txt`, because there is nothing to require.
 
 ```bash
-python3 --version      # 3.10 or newer
-ollama --version       # any recent version
+python3 --version      # 3.10 or newer. This is all you need for v3.
 ```
+
+Running a model-backed configuration without Ollama fails with a clear message
+pointing you at `--version v3` rather than a stack trace.
 
 ## 2. Get the model
 

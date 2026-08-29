@@ -220,16 +220,25 @@ def main() -> int:
             print(f"  {name}  {CONFIGS[name]['label']}")
         return 0
 
-    if not is_available():
-        print("ERROR: no Ollama server. Start it with:  ollama serve", file=sys.stderr)
-        return 2
-    if args.model not in installed_models():
-        print(f"ERROR: model {args.model} not installed. Run:  ollama pull {args.model}", file=sys.stderr)
-        return 2
-
     config = dict(CONFIGS[args.version])
     if args.mode:
         config["mode"] = args.mode
+
+    # Only demand a model server when the chosen configuration actually calls one.
+    # v3 makes zero inference calls, and it is the configuration this project
+    # recommends and reports in the headline. Requiring a 5 GB download before a
+    # reviewer can run the deterministic result would be a self-inflicted barrier
+    # to the one number we most want checked.
+    needs_model = config["mode"] == "baseline" or config.get("model", False)
+    if needs_model:
+        if not is_available():
+            print("ERROR: no Ollama server. Start it with:  ollama serve", file=sys.stderr)
+            print(f"       (or run a configuration that needs no model: --version v3)", file=sys.stderr)
+            return 2
+        if args.model not in installed_models():
+            print(f"ERROR: model {args.model} not installed. Run:  ollama pull {args.model}", file=sys.stderr)
+            print(f"       (or run a configuration that needs no model: --version v3)", file=sys.stderr)
+            return 2
 
     tasks = load_tasks(only=args.only)
     print(f"corpus: {len(tasks)} environments | model: {args.model} | config: {args.version}\n", flush=True)

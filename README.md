@@ -404,14 +404,19 @@ trajectories/            annotated agent runs
 
 ```bash
 git clone https://github.com/Abdullah0157/envguard.git && cd envguard
-ollama pull qwen3:8b
 python3 envguard/sandbox.py                   # 22 isolation checks
 python3 evaluation/check_corpus.py            # prove the answer key
-python3 evaluation/run_eval.py --version v3   # perfect score, 7s, no model calls
+python3 evaluation/run_eval.py --version v3   # perfect score, ~7s
 ```
 
-No API key. No `pip install`. No virtual environment. Standard library plus a
-local Ollama server.
+**Those three commands need Python 3 and nothing else.** No API key, no
+`pip install`, no virtual environment, no model download, no network. The
+recommended configuration makes zero inference calls, so the result this project
+most wants checked is also the cheapest one to check.
+
+Ollama is needed only for the optional model-backed stages (`v0`, `v1`, `v2`,
+`v4`). Running one of those without it fails with a message pointing you back to
+`--version v3`, not a stack trace.
 
 ## Do not trust this README
 
