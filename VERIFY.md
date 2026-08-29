@@ -135,6 +135,13 @@ python3 evaluation/make_report.py > /tmp/regenerated.md
 diff /tmp/regenerated.md evaluation/results.md && echo "tables match the raw results"
 ```
 
+> Run this **before** re-running any evaluation, or pass `--no-save` when you do.
+> A re-run records a fresh wall-clock time into the result file, and the
+> regenerated report will then differ by a second or two purely because your
+> machine is not the machine that produced the committed numbers. That is a
+> timing artefact, not a discrepancy in any claim. Every `run_eval.py` invocation
+> accepts `--no-save` so that checking the evidence cannot alter the evidence.
+
 ---
 
 ## 4. Read the raw evidence

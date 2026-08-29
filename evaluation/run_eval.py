@@ -213,6 +213,12 @@ def main() -> int:
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--only", nargs="*", default=None, help="task ids to restrict to")
     parser.add_argument("--list", action="store_true", help="show configurations and exit")
+    parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="print results but do not write results/<version>.json. Use this when "
+             "verifying, so that checking the evidence cannot alter the evidence.",
+    )
     args = parser.parse_args()
 
     if args.list:
@@ -251,6 +257,13 @@ def main() -> int:
     elapsed = time.monotonic() - started
 
     print_summary(args.version, config, rows, elapsed)
+    if args.no_save:
+        # Verification must not mutate the artefact under verification. Re-running
+        # an evaluation records a fresh wall-clock time, which is machine-specific
+        # and would make a regenerated report differ from the committed one for a
+        # reason that has nothing to do with correctness.
+        print("\n--no-save: committed results left untouched")
+        return 0
     path = write_results(args.version, config, rows, elapsed, args.model)
     print(f"\nwrote {os.path.relpath(path, ROOT)}")
     return 0
