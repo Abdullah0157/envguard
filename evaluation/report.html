@@ -1,0 +1,86 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>envguard: RL environment audit</title><style>
+:root{
+  --surface:#fcfcfb; --panel:#ffffff; --ink:#1a1a19; --ink-2:#4a4a47;
+  --ink-3:#76766f; --rule:#e5e4df;
+  --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --surface:#1a1a19; --panel:#232321; --ink:#f2f1ec; --ink-2:#c3c2ba;
+    --ink-3:#8b8a82; --rule:#33322e;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:40px 24px 72px;
+  background:var(--surface); color:var(--ink);
+  font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto}
+header{border-bottom:1px solid var(--rule);padding-bottom:24px;margin-bottom:32px}
+h1{font-size:26px;font-weight:640;letter-spacing:-.02em;margin:0 0 6px}
+h2{font-size:15px;font-weight:640;letter-spacing:.06em;text-transform:uppercase;
+   color:var(--ink-3);margin:44px 0 14px}
+.sub{color:var(--ink-2);margin:0;font-size:15px}
+.meta{color:var(--ink-3);font-size:13px;margin-top:10px}
+
+/* hero: exactly one per view, proportional figures */
+.hero{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin:28px 0 8px}
+.hero .fig{font-size:56px;font-weight:660;letter-spacing:-.03em;line-height:1}
+.hero .cmp{font-size:15px;color:var(--ink-2)}
+.hero .cmp b{color:var(--ink);font-weight:620}
+
+/* KPI row */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-top:22px}
+.kpi{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px 16px}
+.kpi .label{font-size:12.5px;color:var(--ink-3);margin-bottom:6px}
+.kpi .value{font-size:24px;font-weight:620;letter-spacing:-.02em}
+.kpi .note{font-size:12px;color:var(--ink-3);margin-top:3px}
+
+table{width:100%;border-collapse:collapse;font-size:14px;
+      font-variant-numeric:tabular-nums;margin-top:4px}
+th{text-align:left;font-weight:620;color:var(--ink-3);font-size:12px;
+   letter-spacing:.05em;text-transform:uppercase;
+   padding:9px 10px;border-bottom:1px solid var(--rule)}
+td{padding:10px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right}
+code,pre{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+code{font-size:13px;background:var(--panel);border:1px solid var(--rule);
+     border-radius:5px;padding:1px 5px}
+pre{background:var(--panel);border:1px solid var(--rule);border-radius:8px;
+    padding:13px 15px;overflow-x:auto;font-size:13px;line-height:1.5;margin:10px 0}
+
+/* status: symbol + word, never colour alone */
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;
+       font-weight:600;white-space:nowrap}
+.badge .dot{width:16px;height:16px;border-radius:50%;display:inline-flex;
+            align-items:center;justify-content:center;font-size:11px;
+            font-weight:700;color:#fff;flex:none}
+.good .dot{background:var(--good)} .warning .dot{background:var(--warning);color:#3a2a00}
+.serious .dot{background:var(--serious)} .critical .dot{background:var(--critical)}
+
+details{border:1px solid var(--rule);border-radius:9px;margin:9px 0;
+        background:var(--panel);overflow:hidden}
+summary{cursor:pointer;padding:11px 15px;font-size:14px;font-weight:560;
+        list-style:none;display:flex;align-items:center;gap:10px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"›";color:var(--ink-3);font-size:17px;
+                transition:transform .12s;display:inline-block}
+details[open] summary::before{transform:rotate(90deg)}
+.body{padding:0 15px 15px}
+.disagree{font-size:13px;color:var(--ink-2);margin:6px 0 0;
+          font-variant-numeric:tabular-nums}
+.caption{font-size:13px;color:var(--ink-3);margin:8px 0 0}
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--rule);
+       color:var(--ink-3);font-size:13px}
+@media print{body{padding:0}details{break-inside:avoid}details[open] .body{display:block}}
+</style></head><body><div class='wrap'><header><h1>RL environment audit</h1><p class='sub'>Each environment was attacked. Every defect reported below ships an exploit that was executed, together with the inputs on which it disagrees with the reference solution.</p><p class='meta'>17 environments &middot; configuration <code>v3</code> &middot; model <code>qwen3:8b</code> &middot; 9s &middot; $0.00</p></header><div class='hero'><div class='fig'>0.90</div></div><div class='kpis'><div class="kpi"><div class="label">Defects confirmed</div><div class="value">8/10</div><div class="note">each with a working exploit</div></div><div class="kpi"><div class="label">False alarms</div><div class="value">0/7</div><div class="note">on sound environments</div></div><div class="kpi"><div class="label">Reviewer time</div><div class="value">0.9 min</div><div class="note">per environment</div></div><div class="kpi"><div class="label">Cost</div><div class="value">$0.00</div><div class="note">local inference</div></div><div class="kpi"><div class="label">Inference calls</div><div class="value">0</div><div class="note">167 candidates executed</div></div></div><h2>Against a reviewer who does not execute</h2><p class='caption'>Withheld. The baseline on record was measured on a different corpus size, so the two runs answered different questions. Re-run <code>--version v0</code> to restore this comparison; showing it anyway would misstate the improvement.</p><h2>Every environment</h2><table><tr><th>Environment</th><th>Verdict</th><th>Found by</th><th>Ground truth</th></tr><tr><td><code>t01_average</code></td><td><span class="badge critical"><span class="dot">!</span>Reject</span></td><td><code>template</code></td><td>broken (D1)</td></tr><tr><td><code>t02_clamp</code></td><td><span class="badge critical"><span class="dot">!</span>Reject</span></td><td><code>template</code></td><td>broken (D2)</td></tr><tr><td><code>t03_slugify</code></td><td><span class="badge critical"><span class="dot">!</span>Reject</span></td><td><code>template</code></td><td>broken (D3)</td></tr><tr><td><code>t04_word_frequencies</code></td><td><span class="badge critical"><span class="dot">!</span>Reject</span></td><td><code>template</code></td><td>broken (D4)</td></tr><tr><td><code>t05_parse_int</code></td><td><span class="badge critical"><span class="dot">!</span>Reject</span></td><td><code>template</code></td><td>broken (D5)</td></tr><tr><td><code>t06_top_k</code></td><td><span class="badge critical"><span class="dot">!</span>Reject</span></td><td><code>template</code></td><td>broken (D6)</td></tr><tr><td><code>t07_roman</code></td><td><span class="badge critical"><span class="dot">!</span>Reject</span></td><td><code>template</code></td><td>broken (D7)</td></tr><tr><td><code>t08_days_between</code></td><td><span class="badge serious"><span class="dot">!</span>Repair</span></td><td>&mdash;</td><td>broken (D8)</td></tr><tr><td><code>t09_fizzbuzz</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>sound</td></tr><tr><td><code>t10_dedupe</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>sound</td></tr><tr><td><code>t11_is_palindrome</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>sound</td></tr><tr><td><code>t12_chunk</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>sound</td></tr><tr><td><code>t13_normalize_whitespace</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>sound</td></tr><tr><td><code>t14_merge_sorted</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>sound</td></tr><tr><td><code>t15_safe_divide</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>sound</td></tr><tr><td><code>t16_fib</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>broken (D9) &nbsp;<b>MISMATCH</b></td></tr><tr><td><code>t17_initials</code></td><td><span class="badge good"><span class="dot">+</span>Ship</span></td><td>&mdash;</td><td>broken (D9) &nbsp;<b>MISMATCH</b></td></tr></table><h2>Evidence for each confirmed defect</h2><details><summary><span class="badge critical"><span class="dot">!</span>Reject</span> <code>t01_average</code></summary><div class='body'><p class='caption'>This solution is wrong, and the verifier accepted it:</p><pre>def average(numbers):
+    return 42</pre><p class='caption'>Executed side by side with the reference solution:</p><p class='disagree'>&nbsp;&nbsp;<code>([2, 4, 6],)</code> &rarr; reference <code>4.0</code>, this solution <code>42</code></p><p class='disagree'>&nbsp;&nbsp;<code>([],)</code> &rarr; reference <code>0</code>, this solution <code>42</code></p><p class='disagree'>&nbsp;&nbsp;<code>([1],)</code> &rarr; reference <code>1.0</code>, this solution <code>42</code></p></div></details><details><summary><span class="badge critical"><span class="dot">!</span>Reject</span> <code>t02_clamp</code></summary><div class='body'><p class='caption'>This solution is wrong, and the verifier accepted it:</p><pre>def clamp(value, low, high):
+    return value</pre><p class='caption'>Executed side by side with the reference solution:</p><p class='disagree'>&nbsp;&nbsp;<code>(0, 0, -1)</code> &rarr; reference <code>-1</code>, this solution <code>0</code></p><p class='disagree'>&nbsp;&nbsp;<code>(0, 1, 0)</code> &rarr; reference <code>1</code>, this solution <code>0</code></p><p class='disagree'>&nbsp;&nbsp;<code>(0, 1, 1)</code> &rarr; reference <code>1</code>, this solution <code>0</code></p></div></details><details><summary><span class="badge critical"><span class="dot">!</span>Reject</span> <code>t03_slugify</code></summary><div class='body'><p class='caption'>This solution is wrong, and the verifier accepted it:</p><pre>def slugify(title):
+    return &#x27;hello-world-again&#x27;</pre><p class='caption'>Executed side by side with the reference solution:</p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;&#x27;,)</code> &rarr; reference <code>&#x27;&#x27;</code>, this solution <code>&#x27;hello-world-again&#x27;</code></p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;a&#x27;,)</code> &rarr; reference <code>&#x27;a&#x27;</code>, this solution <code>&#x27;hello-world-again&#x27;</code></p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;ab&#x27;,)</code> &rarr; reference <code>&#x27;ab&#x27;</code>, this solution <code>&#x27;hello-world-again&#x27;</code></p></div></details><details><summary><span class="badge critical"><span class="dot">!</span>Reject</span> <code>t04_word_frequencies</code></summary><div class='body'><p class='caption'>This solution is wrong, and the verifier accepted it:</p><pre>def word_frequencies(text):
+    return []</pre><p class='caption'>Executed side by side with the reference solution:</p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;a b a&#x27;,)</code> &rarr; reference <code>{&#x27;a&#x27;: 2, &#x27;b&#x27;: 1}</code>, this solution <code>[]</code></p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;&#x27;,)</code> &rarr; reference <code>{}</code>, this solution <code>[]</code></p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;a&#x27;,)</code> &rarr; reference <code>{&#x27;a&#x27;: 1}</code>, this solution <code>[]</code></p></div></details><details><summary><span class="badge critical"><span class="dot">!</span>Reject</span> <code>t05_parse_int</code></summary><div class='body'><p class='caption'>This solution is wrong, and the verifier accepted it:</p><pre>def parse_int_or_none(text):
+    return 42</pre><p class='caption'>Executed side by side with the reference solution:</p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;12&#x27;,)</code> &rarr; reference <code>12</code>, this solution <code>42</code></p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;abc&#x27;,)</code> &rarr; reference <code>None</code>, this solution <code>42</code></p><p class='disagree'>&nbsp;&nbsp;<code>(&#x27;&#x27;,)</code> &rarr; reference <code>None</code>, this solution <code>42</code></p></div></details><details><summary><span class="badge critical"><span class="dot">!</span>Reject</span> <code>t06_top_k</code></summary><div class='body'><p class='caption'>This solution is wrong, and the verifier accepted it:</p><pre>def top_k(items, k):
+    return []</pre><p class='caption'>Executed side by side with the reference solution:</p><p class='disagree'>&nbsp;&nbsp;<code>([5, 1, 9], 2)</code> &rarr; reference <code>[9, 5]</code>, this solution <code>[]</code></p><p class='disagree'>&nbsp;&nbsp;<code>([1], 1)</code> &rarr; reference <code>[1]</code>, this solution <code>[]</code></p><p class='disagree'>&nbsp;&nbsp;<code>([1], 2)</code> &rarr; reference <code>[1]</code>, this solution <code>[]</code></p></div></details><details><summary><span class="badge critical"><span class="dot">!</span>Reject</span> <code>t07_roman</code></summary><div class='body'><p class='caption'>This solution is wrong, and the verifier accepted it:</p><pre>def roman_to_int(numeral):
+    return 42</pre><p class='caption'>Executed side by side with the reference solution:</p><p class='disagree'>&nbsp;&nbsp;<code>(0,)</code> &rarr; reference <code>raises TypeError</code>, this solution <code>42</code></p><p class='disagree'>&nbsp;&nbsp;<code>(1,)</code> &rarr; reference <code>raises TypeError</code>, this solution <code>42</code></p><p class='disagree'>&nbsp;&nbsp;<code>(-1,)</code> &rarr; reference <code>raises TypeError</code>, this solution <code>42</code></p></div></details><footer>Generated by <code>evaluation/make_html_report.py</code> from committed result files. No number here is typed by hand. A verdict of <b>Reject</b> or <b>Repair</b> is a recommendation to a human, never an action: envguard does not edit, delete, or ship anything itself.</footer></div></body></html>

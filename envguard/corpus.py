@@ -35,6 +35,10 @@ class Task:
     hard_case: str | None = None
     reference_exploit: str | None = None
     entrypoints: list[str] = field(default_factory=list)
+    # False for defects deterministic templates cannot express: D8 (nothing to
+    # attack, only the sanity gate reaches it) and D9 (needs a mapping over the
+    # tested inputs, which a single-constant template cannot represent).
+    template_beatable: bool = True
 
     @property
     def entrypoint(self) -> str:
@@ -122,6 +126,7 @@ def load_tasks(only: list[str] | None = None) -> list[Task]:
                 hard_case=entry.get("hard_case"),
                 reference_exploit=entry.get("reference_exploit"),
                 entrypoints=ordered,
+                template_beatable=bool(entry.get("template_beatable", True)),
             )
         )
 

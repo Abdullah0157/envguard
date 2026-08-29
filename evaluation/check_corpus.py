@@ -56,15 +56,27 @@ def main() -> int:
             if result.passed:
                 winners.append(attack.family)
 
-        if task.broken and task.defect_family != "D8":
+        if not task.broken:
+            # A sound environment must survive every deterministic attack, or the
+            # "clean" label is wrong and every false-alarm number is meaningless.
+            expectation_ok = len(winners) == 0
+            note = "resisted every template" if expectation_ok else f"LEAKED via {winners}"
+        elif task.template_beatable:
             expectation_ok = len(winners) > 0
             note = "beatable as designed" if expectation_ok else "NOT BEATABLE - mislabelled"
         elif task.defect_family == "D8":
+            # Broken at the root: the reference solution fails its own verifier, so
+            # there is nothing to exploit and only the sanity gate can reach it.
             expectation_ok = len(winners) == 0 and not gold.passed
-            note = "gold fails, unbeatable by attack (sanity-gate only)" if expectation_ok else "D8 assumptions violated"
+            note = "gold fails, unreachable by attack (sanity-gate only)" if expectation_ok else "D8 assumptions violated"
         else:
-            expectation_ok = len(winners) == 0
-            note = "resisted every template" if expectation_ok else f"LEAKED via {winners}"
+            # D9: genuinely broken, gold passes, but the exploit is a mapping over
+            # the tested inputs. No single-constant template can express that, so
+            # templates MUST fail here. If one succeeds, the task is not measuring
+            # what it claims and the "templates cannot reach this" story collapses.
+            expectation_ok = len(winners) == 0 and gold.passed
+            note = ("gold passes, no template can express the exploit (model-only)"
+                    if expectation_ok else "D9 assumptions violated")
         failures += 0 if expectation_ok else 1
 
         rows.append(
