@@ -68,7 +68,7 @@ cannot find" in the README.
 | 6 | Every checkable claim the baseline made about environments it cleared is false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a total that is not N of N. The count grows with the corpus: it was 6 of 6 and is now **7 of 7**, because relabelling `t13_normalize_whitespace` added a row. A fixed number here is itself a defect, and this row previously carried one. |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
-| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 36 checks, described below. |
+| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 39 checks, described below. |
 
 ### On claim 9, which exists because this project failed it
 

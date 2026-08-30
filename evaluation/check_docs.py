@@ -560,6 +560,29 @@ def main() -> int:
             f"the README retracts. Rebuild with: ./run.sh report",
         )
 
+    # ------------------------------------------ corpus shapes must sum to the size
+    # Any "N broken and M sound" in prose has to add up to the number of tasks.
+    # A reviewer found "9 broken and 5 sound", which sums to 14, inside the very
+    # sentence arguing that mixing corpus versions misstates a comparison. Every
+    # real shape this corpus has had sums to 15: 8+7, 9+6, 10+5, and the 12+3
+    # alternative labelling discussed in the README. Checking the sum catches a
+    # miscounted shape without needing to know which version is being described,
+    # so historical figures stay legal and typos do not.
+    SHAPE = re.compile(r"(\d{1,2})\s+broken\s+and\s+(\d{1,2})\s+sound", re.I)
+    for name in DOCS:
+        text = read(name)
+        bad_shapes = [
+            (int(a), int(b)) for a, b in SHAPE.findall(text)
+            if int(a) + int(b) != total
+        ]
+        check(
+            f"{name} states no corpus shape that fails to sum to {total}",
+            not bad_shapes,
+            f"found {bad_shapes}; every shape this corpus has had sums to {total}. "
+            f"A shape that does not add up is a miscount whichever version it "
+            f"describes.",
+        )
+
     # ---------------------------------- the manifest's own prose and family keys
     # The answer key contradicted itself: manifest.json's description said
     # "9 carry a verifier defect; 6 are sound" while its per-task flags said 10

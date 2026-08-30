@@ -126,7 +126,7 @@ Expected final lines:
 ```
 sandbox self-test: PASS
 RESULT: PASS - answer key is sound
-RESULT: PASS - documentation matches the evidence (36 checks)
+RESULT: PASS - documentation matches the evidence (39 checks)
 llm self-test: PASS
 ```
 

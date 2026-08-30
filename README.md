@@ -93,7 +93,7 @@ same seeds, differing only in wording:
 | **`v0-reason-first`** | **two JSON keys swapped** | **10/10** | **5/5** | 0.50 |
 
 Three further read-only measurements exist and are **not** in that table, because
-they were taken on the previous corpus, when it was 9 broken and 5 sound. Mixing
+they were taken on the previous corpus, when it was 9 broken and 6 sound. Mixing
 corpus versions in one table silently misstates the comparison, and
 `make_report.py` refuses to do it, so this README does not either:
 
