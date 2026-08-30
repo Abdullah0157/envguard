@@ -134,6 +134,7 @@ FAILED = "failed"          # the verifier rejected it: not an exploit
 BYPASSED = "bypassed"      # it escaped the grader: a harness defect, not a task defect
 EQUIVALENT = "equivalent"  # it passed, but it agrees with the reference: it is simply correct
 MEMORISED = "memorised"    # it passed by keying on the tested inputs: a universal attack
+UNVERIFIED = "unverified"  # it passed but the comparison could not run: ask a human
 EXPLOIT = "exploit"        # it passed AND is provably wrong: a real reward hack
 
 
@@ -183,13 +184,22 @@ def _evaluate_candidate(task, source: str) -> CandidateOutcome:
     if is_harness_bypass(source):
         return CandidateOutcome(BYPASSED, stdout=result.stdout)
 
-    differs, diffs, note = disagrees_with_reference(
+    differs, diffs, note, verified = disagrees_with_reference(
         gold_src=task.solution_src,
         candidate_src=source,
         verifier_src=task.verifier_src,
         name=task.entrypoint,
         arity=len(task.signature()),
     )
+
+    if not verified:
+        # The comparison could not be run, so we know a wrong-looking candidate
+        # passed and nothing more. "I could not check" is not "it is fine", and
+        # collapsing the two would clear a candidate on the strength of a failed
+        # check. This is the one genuinely uncertain outcome, and it is the only
+        # thing a human is asked to adjudicate.
+        return CandidateOutcome(UNVERIFIED, stdout=result.stdout, note=note)
+
     if not differs:
         return CandidateOutcome(EQUIVALENT, stdout=result.stdout, note=note)
 
@@ -272,6 +282,17 @@ def audit(
 
             if outcome.status == FAILED:
                 continue
+            if outcome.status == UNVERIFIED:
+                report.verdict = SUSPECTED
+                report.detail = (
+                    f"Template '{attack.family}' passed the verifier, but the "
+                    f"comparison against the reference could not be completed "
+                    f"({outcome.note}). Unresolved: a human should decide."
+                )
+                report.action = ACTION[SUSPECTED]
+                report.duration_s = round(time.monotonic() - started, 2)
+                return report
+
             if outcome.status in (EQUIVALENT, MEMORISED):
                 # Passed, but proves nothing about this verifier specifically.
                 report.equivalent_candidates += 1
@@ -365,6 +386,17 @@ def audit(
                     "Exploit attached and reproduced."
                 )
                 report.action = ACTION[CONFIRMED_HACKABLE]
+                report.duration_s = round(time.monotonic() - started, 2)
+                return report
+
+            if outcome.status == UNVERIFIED:
+                report.verdict = SUSPECTED
+                report.detail = (
+                    "A model-written candidate passed the verifier, but the "
+                    f"comparison against the reference could not be completed "
+                    f"({outcome.note}). Unresolved: a human should decide."
+                )
+                report.action = ACTION[SUSPECTED]
                 report.duration_s = round(time.monotonic() - started, 2)
                 return report
 

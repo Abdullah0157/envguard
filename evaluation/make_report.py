@@ -251,16 +251,35 @@ def main() -> int:
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args()
 
+    results = load_results()
+    conflict = corpus_conflict(results)
+
     text = render()
     # end="" so stdout is byte-identical to the written file. VERIFY.md tells the
     # reader to `diff` one against the other as a check that the prose tables were
     # not hand-edited, and a stray trailing newline would fail that check.
     print(text, end="")
-    if args.write:
-        path = os.path.join(ROOT, "evaluation", "results.md")
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        print(f"\nwrote {os.path.relpath(path, ROOT)}", file=sys.stderr)
+
+    if not args.write:
+        return 0
+
+    # Refusing to publish must not also destroy what is already published.
+    #
+    # The first version of this guard opened results.md for writing and only then
+    # decided it had nothing valid to write, replacing a committed results table
+    # with a one-line refusal. A reviewer following REPRODUCTION.md hit exactly
+    # that and reported it: the guide's own instructions deleted the repository's
+    # results. Refusal now happens before the file is touched, and exits non-zero
+    # so a script cannot mistake it for success.
+    if conflict:
+        print(f"\nREFUSED to write evaluation/results.md: {conflict}", file=sys.stderr)
+        print("The existing file is left untouched.", file=sys.stderr)
+        return 3
+
+    path = os.path.join(ROOT, "evaluation", "results.md")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    print(f"\nwrote {os.path.relpath(path, ROOT)}", file=sys.stderr)
     return 0
 
 

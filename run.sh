@@ -40,7 +40,11 @@ cmd_verify() {
 
 cmd_fast() {
   banner "deterministic audit of all 15 environments (no model calls)"
-  "$PY" -u evaluation/run_eval.py --version v3
+  # --no-save because this is the "show me it works" command, run casually and
+  # often. Without it, every demo silently rewrote the committed v3 result with a
+  # fresh wall-clock time, which is the exact hazard VERIFY.md warns about. A
+  # command that displays a result must not alter it.
+  "$PY" -u evaluation/run_eval.py --version v3 --no-save
 }
 
 cmd_compare() {

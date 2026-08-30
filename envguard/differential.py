@@ -242,21 +242,29 @@ def disagrees_with_reference(
     verifier_src: str,
     name: str,
     arity: int,
-) -> tuple[bool, list[dict], str]:
+) -> tuple[bool, list[dict], str, bool]:
     """Run reference and candidate side by side.
 
-    Returns ``(differs, examples, note)``. ``differs`` is True only when a
-    concrete input produced different observable behaviour, which is the
-    evidence that the candidate is genuinely incorrect.
+    Returns ``(differs, examples, note, verified)``.
+
+    ``differs`` is True only when a concrete input produced different observable
+    behaviour, which is the evidence that the candidate is genuinely incorrect.
+
+    ``verified`` says whether the comparison actually ran. It exists because the
+    two failure modes are not the same and were previously conflated: "I checked
+    and found no disagreement" cleared a candidate, and so did "I could not
+    check". The second is not evidence of anything, and treating it as
+    exoneration silently turns an unverifiable result into a clean bill of
+    health. Callers route unverified passes to a human instead.
     """
     if not name:
-        return False, [], "no entrypoint to compare"
+        return False, [], "no entrypoint to compare", False
 
     probes = build_probes(verifier_src, name, arity)
     try:
         serialised = json.dumps([list(p) for p in probes])
     except (TypeError, ValueError):
-        return False, [], "probe inputs are not serialisable"
+        return False, [], "probe inputs are not serialisable", False
 
     probe_script = PROBE_TEMPLATE.format(
         name=name, probes=serialised, max_examples=MAX_EXAMPLES
@@ -270,25 +278,25 @@ def disagrees_with_reference(
     if not result.passed:
         # The comparison harness itself could not run (candidate fails at import,
         # crashes the interpreter, loops). Report no evidence rather than guess.
-        return False, [], f"differential harness did not complete ({result.summary()})"
+        return False, [], f"differential harness did not complete ({result.summary()})", False
 
     marker = "DIFFJSON:"
     line = next(
         (ln for ln in result.stdout.splitlines() if ln.startswith(marker)), None
     )
     if line is None:
-        return False, [], "differential harness produced no report"
+        return False, [], "differential harness produced no report", False
 
     try:
         payload = json.loads(line[len(marker):], strict=False)
     except json.JSONDecodeError:
-        return False, [], "differential report was unreadable"
+        return False, [], "differential report was unreadable", False
 
     diffs = payload.get("diffs", [])
     compared = payload.get("compared", 0)
     if diffs:
-        return True, diffs, f"disagrees with the reference on {len(diffs)} of {compared} probes"
-    return False, [], f"agrees with the reference on all {compared} probes"
+        return True, diffs, f"disagrees with the reference on {len(diffs)} of {compared} probes", True
+    return False, [], f"agrees with the reference on all {compared} probes", True
 
 
 if __name__ == "__main__":
@@ -311,7 +319,7 @@ if __name__ == "__main__":
     for task_id, label, candidate in cases:
         task = tasks[task_id]
         src = candidate if candidate is not None else task.solution_src
-        differs, examples, note = disagrees_with_reference(
+        differs, examples, note, _verified = disagrees_with_reference(
             task.solution_src, src, task.verifier_src, task.entrypoint, len(task.signature())
         )
         print(f"  {task_id:20s} {label:45s} differs={differs!s:5s}  {note}")
