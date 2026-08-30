@@ -114,6 +114,24 @@ def headline_table(results: dict) -> str:
     f_total_min, f_per_env = human_minutes(full)
     saved = (1 - f_per_env / b_per_env) * 100 if b_per_env else 0.0
 
+    # Counted from the rows rather than asserted in prose. An earlier version of
+    # this function hardcoded a sentence claiming the baseline "flags all 15
+    # environments" while "finding every defect"; the committed v0 flags 2 and
+    # finds 2 of 9, so both halves were false and the falsehood was rendered into
+    # results.md on every run. Deriving the numbers means the sentence cannot
+    # drift from the data it describes.
+    def flagged(payload: dict) -> int:
+        return sum(1 for r in payload["rows"] if r["flagged"])
+
+    def with_evidence(payload: dict) -> int:
+        return sum(
+            1 for r in payload["rows"]
+            if r["flagged"] and (bool(r.get("evidence")) or r.get("verdict") == "GOLD_FAILURE")
+        )
+
+    b_flagged, f_flagged = flagged(base), flagged(full)
+    f_with_evidence = with_evidence(full)
+
     rows = [
         ("**Primary outcome** (balanced accuracy)", f"**{bm['balanced_accuracy']:.2f}**",
          f"**{fm['balanced_accuracy']:.2f}**", f"**{change(bm['balanced_accuracy'], fm['balanced_accuracy'])}**"),
@@ -153,9 +171,14 @@ def headline_table(results: dict) -> str:
         "reviewer has to do the whole analysis themselves before they can act. "
         "Those two assumptions are the only inputs; disagree with them and you can "
         "recompute from `evaluation/results/*.json` directly.\n"
-        "\nThis is why the baseline saves no reviewer time despite finding every "
-        "defect: it flags all 15 environments and attaches no evidence to any of "
-        "them, so it hands a person the same workload they started with.\n"
+        f"\nThis is where the baseline's reviewer cost comes from. It flags "
+        f"{b_flagged} of {base['corpus_size']} environments and attaches no "
+        f"executed evidence to any of them, so each flag costs a full unaided "
+        f"review and each of the {bm['false_negatives']} defects it missed reaches "
+        f"a lab unexamined. `{HEADLINE_VERSION}` flags {f_flagged} and attaches a "
+        f"runnable exploit to {f_with_evidence} of them, which is why the same "
+        f"corpus costs {b_total_min:.0f} reviewer-minutes on the baseline and "
+        f"{f_total_min:.0f} here.\n"
     )
     return "\n".join(out) + "\n"
 

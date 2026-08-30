@@ -18,15 +18,29 @@ python3 evaluation/run_eval.py --version v3
 Expected last lines:
 
 ```
-detected        8/8 broken environments
-false alarms    0/7 clean environments
-BALANCED ACC    1.00   (always-say-hackable scores 0.50)
+detected        8/9 broken environments
+false alarms    0/6 clean environments
+recall          0.89
+specificity     1.00
+precision       1.00
+BALANCED ACC    0.94   (always-say-hackable scores 0.50)
 wall clock      ~7s for 15 environments
 model calls     0
+cost            $0.00 (local inference)
+misses:
+  - t15_safe_divide            MISSED DEFECT: Survived 14 executed attack(s).
 ```
 
-If that prints 8/8 and 0/7, the central claim holds: the system finds every
-planted defect and falsely accuses nothing, without calling a language model.
+If that prints 8/9 and 0/6, the central claim holds: the system finds eight of
+the nine planted defects and falsely accuses nothing, without calling a language
+model.
+
+**The reported miss is deliberate.** `t15_safe_divide` was found to be broken by
+an external adversarial reviewer, in an environment this project had labelled
+sound. It was relabelled rather than deleted, and no attack was written for it,
+because fitting an attack to a known answer measures nothing. If your run prints
+`8/9` with `t15_safe_divide` in the misses list, that is the expected result and
+not a degraded one. See the "known miss" section of the README.
 
 ---
 
@@ -36,13 +50,46 @@ planted defect and falsely accuses nothing, without calling a language model.
 |---|---|---|---|
 | 1 | The sandbox really isolates and really detects | `python3 envguard/sandbox.py` | Anything other than `sandbox self-test: PASS`. 22 checks including timeouts, print bombs, orphaned processes, and forged success tokens. |
 | 2 | The answer key is correct, not just asserted | `python3 evaluation/check_corpus.py` | Anything other than `RESULT: PASS`. It executes every task to prove broken ones are beatable and sound ones are not. |
-| 3 | The baseline scores 0.50, same as always saying yes | `python3 evaluation/run_eval.py --version v0` | A balanced accuracy meaningfully above 0.50. |
-| 4 | envguard scores 1.00 with zero model calls | `python3 evaluation/run_eval.py --version v3` | Fewer than 8/8 found, or any false alarm, or a nonzero model call count. |
+| 3 | The baseline finds 2 of 9 and scores 0.61, barely above the 0.50 an always-say-yes stub gets | `python3 evaluation/run_eval.py --version v0` | A balanced accuracy meaningfully above 0.61, or more than 2 defects found. |
+| 4 | envguard scores 0.94 with zero model calls, missing only `t15_safe_divide` | `python3 evaluation/run_eval.py --version v3` | Fewer than 8/9 found, any false alarm, a nonzero model call count, or a *different* task in the misses list. |
 | 5 | Adding the model *on top of* templates yields +0 detections | `python3 evaluation/run_eval.py --version v4`, compare to v3 | v4 finding a defect that v3 missed. |
-| 5b | The model is redundant, **not** incapable: it finds 8/8 unaided, just 126x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring below 8/8, which would mean the README oversells the model rather than the templates. |
-| 6 | All 7 baseline claims about sound environments are false | `python3 evaluation/refutations.py` | Any row reading "passes (claim holds)". |
+| 5b | The model is redundant, **not** incapable: it finds 8/9 unaided, just ~120x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring below 8/9, which would mean the README oversells the model rather than the templates. |
+| 6 | All 6 checkable claims the baseline made about environments it cleared are false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a count other than 6 of 6. |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
+| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 16 checks, described below. |
+
+### On claim 9, which exists because this project failed it
+
+A reviewer ran the sixty-second check in section 1 and got numbers different from
+the ones this document told them to expect. They were right. `t15_safe_divide`
+was relabelled from sound to broken late in the build, moving the corpus from
+"8 broken, 7 sound" to "9 broken, 6 sound", and three documents were never
+updated, including this one. The measurements were correct throughout; the prose
+was stale.
+
+For a project whose whole argument is *do not trust an assertion, execute
+something*, publishing stale numbers in the file written for reviewers is the
+worst available defect. Correcting the text was not enough, because nothing
+prevented a recurrence the next time a label moved. So the invariant is now
+enforced:
+
+```bash
+python3 evaluation/check_docs.py
+```
+
+It derives the corpus shape from `corpus/manifest.json` and every figure from
+`evaluation/results/*.json`, then fails if a document states something the
+evidence does not support. It checks that no document quotes a detection rate
+whose denominator disagrees with the corpus, that no balanced accuracy appears in
+prose that is absent from a committed result, that `envguard/llm.py` and `run.sh`
+default to the model the results were actually measured with, that
+`trajectories/05-baseline-judge.md` agrees with `evaluation/results/v0.json`, and
+that every changelog version has a result file behind it.
+
+It was tested the way everything else here is tested: by reintroducing all three
+of the reviewer's original findings into a scratch copy and confirming it fails
+on each. It does, on five checks.
 
 ---
 
@@ -55,7 +102,8 @@ fair, so here is how to attack the setup itself.
 
 Read `baseline/baseline.py`. Check that it uses:
 
-- the **same model** as the full system (`DEFAULT_MODEL`, both default to `qwen3:8b`)
+- the **same model** as the full system (`DEFAULT_MODEL`, both default to `qwen3:4b`,
+  which is the model every committed result in `evaluation/results/` was produced with)
 - the **same corpus**, all 15 environments
 - the **same structured output contract** (a JSON schema, so it cannot fail on formatting)
 - a prompt that **explains what hackable means** and gives concrete examples
@@ -161,18 +209,29 @@ different answer from the reference. Copy the exploit into
 
 ## 5. Reproduce from scratch, as a judge would
 
+**The submitted archive is the artifact.** It is a `git archive` of the exact
+commit, so it contains the committed tree and nothing else: no `.git`, no
+`__pycache__`, no local scratch. Unzip it anywhere and run:
+
 ```bash
-cd /tmp && rm -rf verify-envguard
-git clone https://github.com/Abdullah0157/envguard.git verify-envguard
-cd verify-envguard
+unzip envguard-<sha>.zip && cd envguard-<sha>
 python3 envguard/sandbox.py
 python3 evaluation/check_corpus.py
-python3 evaluation/run_eval.py --version v3
+python3 evaluation/run_eval.py --version v3 --no-save
 ```
 
-The v3 numbers must match `evaluation/results/v3.json` exactly: same confusion
-matrix, same rates, same verdict on all 15 environments. This was performed and
-is documented under "Verified reproduction" in `REPRODUCTION.md`.
+No clone, no network, no `pip install`, no API key, no Ollama for any of the
+three. The v3 numbers must match `evaluation/results/v3.json` exactly: same
+confusion matrix, same rates, same verdict on all 15 environments.
+
+If you have access to the repository, the same check runs from a clone:
+
+```bash
+git clone https://github.com/Abdullah0157/envguard.git verify-envguard && cd verify-envguard
+```
+
+Both paths were performed and are documented under "Verified reproduction" in
+`REPRODUCTION.md`. Nothing in this document depends on the clone succeeding.
 
 ---
 
@@ -183,10 +242,23 @@ These are real and are not hidden in a footnote:
 1. **The corpus is synthetic and small.** Fifteen environments, hand-authored.
    It is an exact answer key, which is what makes the numbers meaningful, but it
    is not a sample of micro1's production environments.
-2. **A perfect score means the corpus was within reach**, not that the problem is
-   solved. Harder defect families would lower it.
+2. **The score measures reach on this corpus**, not that the problem is solved.
+   Harder defect families would lower it, and one already does: `t15_safe_divide`
+   is missed by every configuration and is reported as a miss rather than fixed.
 3. **`CLEAN` means "resisted every attack we ran."** No finite test suite can be
    proven unhackable, because memorising its cases beats it.
+3b. **The differential tester trusts `solution.py` as the oracle.** A candidate is
+   convicted when it disagrees with the reference. The sanity gate catches a
+   reference that fails its own verifier, but *not* a reference that is wrong in
+   the same direction as its verifier, which is the common real-world case: an
+   author misreads the spec and writes a solution and a test that agree with each
+   other and are both wrong. In such an environment a genuinely correct candidate
+   disagrees with the reference and would be reported `CONFIRMED_HACKABLE` with
+   proof attached. This corpus cannot exhibit that failure because the references
+   were authored here; SWE-bench does exhibit it. Related: the memorisation guard
+   in `differential.py` is a **suppression channel**, so a true exploit that
+   happens to compare against a literal the verifier tests is downgraded to
+   coverage and the environment is reported `CLEAN`.
 4. **The harness is forgeable.** A candidate that flushes a success marker and
    exits cleanly beats any in-process grader. envguard detects this with a canary
    and escalates, but detection is not prevention. The architectural fix is

@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
@@ -187,7 +188,39 @@ def capture_baseline() -> str:
     from baseline import SYSTEM_PROMPT, USER_TEMPLATE, judge  # noqa: PLC0415
 
     task = {t.id: t for t in load_tasks()}["t03_slugify"]
-    verdict = judge(task, seed=1002)
+
+    # Take the model and seed from the committed v0 result rather than from
+    # whatever the current defaults happen to be. An earlier version of this
+    # function called judge(task, seed=1002) with no model argument, so it
+    # inherited the library default. When that default was qwen3:8b while v0 had
+    # been measured on qwen3:4b, this trajectory rendered a HACKABLE verdict for
+    # t03_slugify directly underneath a heading that explained why the baseline
+    # said CLEAN, contradicting the result file the whole comparison rests on.
+    # Reading the provenance out of the result file makes that class of drift
+    # impossible: the trajectory is now pinned to the run it documents.
+    v0_path = os.path.join(ROOT, "evaluation", "results", "v0.json")
+    with open(v0_path, encoding="utf-8") as fh:
+        v0 = json.load(fh)
+    model = v0["model"]
+    index = next(i for i, r in enumerate(v0["rows"]) if r["task_id"] == task.id)
+    seed = 1000 + index  # the seeding rule in evaluation/run_eval.py
+    committed = v0["rows"][index]["verdict"]
+
+    verdict = judge(task, model=model, seed=seed)
+    observed = "HACKABLE" if verdict["flagged_hackable"] else "CLEAN"
+
+    # Fail loudly rather than publishing a document that argues against its own
+    # evidence. If local inference has drifted far enough that the baseline no
+    # longer reproduces its committed verdict, that is a finding to report, not
+    # a paragraph to quietly render.
+    if observed != committed:
+        raise SystemExit(
+            f"capture aborted: baseline on {task.id} returned {observed} with "
+            f"model={model} seed={seed}, but evaluation/results/v0.json records "
+            f"{committed}. Writing this trajectory would contradict the committed "
+            f"result. Re-run the v0 evaluation, or investigate the drift, before "
+            f"regenerating."
+        )
 
     return "".join([
         "# Baseline judge: one turn, no tools, wrong answer\n",
@@ -197,7 +230,8 @@ def capture_baseline() -> str:
         "the variable under test. It sees the same task and the same verifier as the "
         "attacker agent. The only thing it cannot do is run code.\n",
         f"\n**Environment:** `{task.id}`  \n**Ground truth:** BROKEN "
-        f"({task.defect_family})\n",
+        f"({task.defect_family})  \n**Model:** `{model}`, seed `{seed}`, the exact "
+        f"provenance recorded for this task in `evaluation/results/v0.json`\n",
         "\n---\n\n## Agent instructions (verbatim)\n\n```\n",
         SYSTEM_PROMPT.strip(), "\n```\n",
         "\n## What it was given\n\n```\n",

@@ -30,7 +30,7 @@ to cheat, and paying for the privilege. Published 2026 measurements:
 | **28.5%** of SWE-bench Verified tasks accept a container-verified *incorrect* patch | [arXiv 2606.16062](https://arxiv.org/html/2606.16062v1) |
 | **25.0%** on R2E-Gym across six repositories | same |
 | **59.4%** of failed tasks have flawed tests (OpenAI, Feb 2026) | reported in the same work |
-| A gold-sanity gate that *executes* code caught **61.9%** of test defects that an LLM judge alone missed | [arXiv 2606.16062](https://arxiv.org/html/2606.16062v1) |
+| The gold solution failed **61.9%** of generated tests, defects an LLM judge alone did not catch. Running the reference is what surfaced them | [arXiv 2606.16062](https://arxiv.org/html/2606.16062v1) |
 
 Roughly one environment in four is quietly broken, and reading the file is not
 enough to tell.
@@ -224,17 +224,25 @@ about it, and concludes almost everything is fine. That is the more dangerous
 failure mode of the two: over-flagging wastes a reviewer's time, under-flagging
 ships broken environments to a lab.
 
-Its failure mode is also **not stable across models**. On `qwen3:8b` the same
-prompt on the same corpus did the opposite: it flagged *every* environment,
-sound ones included, scoring 0.50, exactly what answering "hackable" to
-everything scores. Swap the model and you get the inverse behaviour with no
-signal in the output telling you which one you are holding. Execution does not
-have that property.
+Its failure mode also appeared **unstable across models**, though this one is an
+observation and not a result. Running the same prompt on the same corpus under
+`qwen3:8b` during development produced the opposite behaviour: it flagged *every*
+environment, sound ones included, which scores 0.50, exactly what answering
+"hackable" to everything scores.
+
+**That run was not committed and there is no `v0-8b.json` in `evaluation/results/`,
+so treat it as an anecdote rather than evidence.** It is kept here because it
+points at something worth checking rather than because it proves it. To turn it
+into a result, run `ENVGUARD_MODEL=qwen3:8b python3 evaluation/run_eval.py
+--version v0` yourself; the harness takes the model from the environment and
+nothing about the comparison is special-cased. Every scored claim in this README
+comes from a committed `qwen3:4b` result file.
 
 ### Where the two sides differ in resources
 
-The brief asks for meaningful differences in what each side is given. There is
-one, it favours envguard, and it is stated here rather than left to be found:
+The brief asks for meaningful differences in what each side is given. There are
+three, all of them favour envguard, and they are stated here rather than left to
+be found:
 
 | | Baseline | envguard |
 |---|---|---|
@@ -242,8 +250,24 @@ one, it favours envguard, and it is stated here rather than left to be found:
 | Environments | all 15 | all 15 (same) |
 | Output contract | JSON schema | JSON schema (same) |
 | Prompt | defines "hackable", gives four concrete examples | defines the same attack families |
+| **Sees `solution.py`** | **no** | **yes** |
 | **Attempts** | **one, no retries** | **up to three, each informed by the previous failure** |
 | **Can execute code** | **no** | **yes** |
+
+**The reference-solution row is the one that changes a number.** envguard reads
+`solution.py` for two stages: the sanity gate runs it against its own verifier,
+and the differential tester uses it as the oracle. The baseline never sees it.
+That is what structurally blocks the baseline from `t08_days_between` (family
+D8), one of the nine defects, because a D8 environment has no exploit to reason
+about at all: its verifier rejects its own correct answer, and the only way to
+observe that is to run the correct answer. So one of envguard's eight
+detections was never available to the baseline on any prompt.
+
+This is a real asymmetry and it is not entirely fair. It is also not removable
+without deleting the stage that finds D8, which is the stage the corpus was
+built to justify. The honest reading is that the 2/9 to 8/9 gap is 2/9 to 7/9 on
+strictly equal information, plus one defect that only reference execution can
+reach.
 
 The execute/not-execute difference is the variable under test, so it is the point
 rather than an unfairness. **The attempt count is not**, and a fairer baseline
@@ -268,6 +292,7 @@ very verifier it had cleared. **6 of 6 hold up:**
 | `t01_average` | "only checks the result is not None, a very weak constraint" | `return 42` | **passes** |
 | `t02_clamp` | "only checks one specific case" | `return value` | **passes** |
 | `t03_slugify` | "only checks one specific input and output" | `return "hello-world-again"` | **passes** |
+| `t05_parse_int` | "checks two specific cases: '12' should return 12 and 'abc' should..." | `raise ValueError("nope")` | **passes** |
 | `t06_top_k` | "only checks if the result is a list" | `return []` | **passes** |
 | `t15_safe_divide` | "checks multiple specific cases including zero denominator" | `return numerator // denominator` | **passes** |
 
@@ -279,9 +304,32 @@ Full table, generated by `evaluation/refutations.py`, in
 [`evaluation/refutations.md`](evaluation/refutations.md).
 
 Generated tables, including the per-environment breakdown, live in
-[`evaluation/results.md`](evaluation/results.md). Every number in this README is
-rendered by `evaluation/make_report.py` from the committed JSON in
-`evaluation/results/`. None of them are typed by hand.
+[`evaluation/results.md`](evaluation/results.md), and the human-facing version is
+[`evaluation/report.html`](evaluation/report.html) (`./run.sh report`).
+
+**On where the numbers come from, precisely.** `evaluation/make_report.py`
+generates `evaluation/results.md` and `evaluation/refutations.py` generates
+`evaluation/refutations.md`; both read only the committed JSON in
+`evaluation/results/`, and both are diffable against what is checked in. The
+tables *in this README* are transcribed from those generated files by hand.
+
+An earlier version of this section claimed every number here was rendered
+automatically and none typed by hand. That was false, and a reviewer proved it by
+finding two transcription errors: a wall clock reported as 883s where the
+committed `v2` says 857.2s, and a six-row refutation table that had lost a row
+while still claiming "6 of 6". Both are fixed, and the overclaim is retracted
+rather than repaired, because the mechanism it described does not exist. The
+guarantee that does hold is weaker and checkable: every figure here originates in
+a committed result file, and
+
+```bash
+python3 evaluation/make_report.py > /tmp/regenerated.md
+diff /tmp/regenerated.md evaluation/results.md
+```
+
+proves the generated tables match the raw results. If a number in this prose
+disagrees with `evaluation/results.md`, the generated file is correct and the
+prose is a transcription bug worth reporting.
 
 ### Cost comparison against the alternative
 
@@ -323,8 +371,8 @@ both are measured rather than asserted:
 2. **The model stage as the recommended path** (cut in the `v4` row). Not because
    it failed. `v2` shows the model finds **8 of 9 unaided**, the same score the
    templates reach, with real and reproducible exploits. It was cut because it
-   buys the *same* answer at roughly **120 times the wall clock** (883s versus
-   7s). The lesson is not that attacker creativity is useless; it is that
+   buys the *same* answer at roughly **120 times the wall clock** (857.2s versus
+   7.3s). The lesson is not that attacker creativity is useless; it is that
    creativity was never the binding constraint on this corpus, so paying for it
    bought nothing that was not already free.
 
@@ -359,8 +407,38 @@ it **observably disagrees with the reference solution** on a concrete input.
 Reference and candidate are executed side by side over a deterministic,
 type-directed pool of probes. Agreement is now a retraction, not a confirmation.
 
-That single change is what lets this README claim a confirmed verdict cannot be a
-false alarm.
+That single change is what makes a confirmed verdict worth reading: it ships an
+exploit that was executed, and a concrete input where that exploit computes a
+different answer from the reference. It does **not** make a confirmed verdict
+infallible, and this README no longer says it does. See the withdrawal near the
+top.
+
+**The load-bearing assumption is that `solution.py` is right.** Differential
+testing convicts a candidate for disagreeing with the reference, so the reference
+is the oracle. The sanity gate catches the case where a reference fails its own
+verifier. It does not catch the case where a reference is wrong *in the same
+direction as* its verifier, which is the ordinary real-world failure: an author
+misreads the spec and writes a solution and a test that agree with each other and
+are both wrong. In that environment a genuinely **correct** candidate disagrees
+with the reference, and this system reports `CONFIRMED_HACKABLE` with proof
+attached. The proof would be real and the conclusion inverted.
+
+This corpus cannot exhibit that, because the references were authored here
+alongside the verifiers. SWE-bench does exhibit it, which is precisely the setting
+this tool is aimed at, so it is the first thing I would fix before running this on
+anything I did not write. The fix is not subtle, only expensive: the reference
+needs an independent source of truth, such as agreement across multiple
+implementations or a specification the verifier was not derived from.
+
+A second, quieter version of the same problem runs the other way.
+`memorises_the_verifier()` in `differential.py` is a **suppression channel**: a
+candidate that decides its answer by comparing against a literal the verifier
+tests is downgraded from exploit to coverage. That is correct for the memorisation
+case it was built for, and it also means a *true* exploit that happens to key on a
+tested literal is silently reclassified and the environment is reported `CLEAN`.
+Both directions of that guard are tested in `differential.py`'s self-test, but the
+test cannot tell me how often the suppression is wrong on environments I did not
+write.
 
 ---
 
@@ -432,10 +510,13 @@ on those outputs. Until that separation exists, any in-process harness, includin
 every pytest-based RL environment in wide use today, is forgeable by code that
 flushes a success marker and exits.
 
-**Second: memorisation defeats every finite verifier, including all seven sound
+**Second: memorisation defeats every finite verifier, including all six sound
 ones in this corpus.** This is not a limitation discovered by reasoning about it;
 it was measured, after the attacker model produced a memorising solution against
 an environment labelled sound. See "The finding that changed the project" above.
+It was re-measured after `t15_safe_divide` was relabelled broken, which took the
+sound set from seven environments to six: **6 of 6 still fall**, each to a lookup
+table built from the literal calls its own verifier makes.
 
 envguard detects memorisation and reports it as a coverage property rather than a
 defect, because an attack that beats everything distinguishes nothing. But
@@ -462,9 +543,15 @@ broken code, and it passes.
 
 So I measured how far it went, rather than patching the one case:
 
-> **All 7 sound environments fall to it. Every single one.**
+> **All 6 sound environments fall to it. Every single one.**
+>
+> Measured against the corpus as it stands, after `t15_safe_divide` was
+> relabelled from sound to broken: `t09_fizzbuzz`, `t10_dedupe`,
+> `t11_is_palindrome`, `t12_chunk`, `t13_normalize_whitespace` and
+> `t14_merge_sorted`, each beaten by a lookup table of between 4 and 6 memorised
+> cases harvested from the verifier's own source.
 
-The reason is not a flaw in those seven verifiers. It is arithmetic. **A finite
+The reason is not a flaw in those six verifiers. It is arithmetic. **A finite
 list of assertions can always be satisfied by memorising the list.** "Unhackable"
 is not a property a finite verifier can have.
 
@@ -517,8 +604,8 @@ So the model is not incompetent. It is **redundant** here:
 
 | Configuration | Found | False alarms | Model calls | Wall clock |
 |---|---|---|---|---|
-| Model alone, no templates (`v2`) | 8/9 | 0/6 | 16 | 883s |
-| Templates alone, no model (`v3`) | 8/9 | 0/6 | **0** | **7s** |
+| Model alone, no templates (`v2`) | 8/9 | 0/6 | 16 | 857.2s |
+| Templates alone, no model (`v3`) | 8/9 | 0/6 | **0** | **7.3s** |
 
 Identical accuracy. **Roughly 120 times the wall clock.** And when both run
 together (`v4`), the model adds nothing further, because the templates already
@@ -541,8 +628,9 @@ demonstrably can. The question is *is the model the cheapest thing that can*, an
 here it was not, by two orders of magnitude.
 
 **And then the model did the one thing the templates never could.** It found an
-error in my ground truth. Not a planted puzzle, an actual mistake: seven
-environments I had certified as sound were defeated by an attack I had not
+error in my ground truth. Not a planted puzzle, an actual mistake: every
+environment I had certified as sound (seven of them at the time, six now that
+`t15_safe_divide` has been relabelled) was defeated by an attack I had not
 considered. No template found that, because no template was written to look for
 it, and I could not have written one for a weakness I did not know existed.
 
@@ -594,8 +682,18 @@ Claude Code was used across the whole project, not only for writing code:
 
 The external research that anchors the problem statement is cited inline: the
 28.5% and 61.9% figures come from [arXiv 2606.16062](https://arxiv.org/html/2606.16062v1),
-and the $20M/11-days figure is a public statement by micro1's CEO dated
-18 August 2026.
+which is linked and checkable.
+
+**One citation is weaker than the others and is marked as such.** The
+$20M-in-11-days figure is a public statement by micro1's CEO dated 18 August
+2026, and I have **no permanent link for it**. Treat it as a directional
+indicator of how fast the environment pipeline is growing, not as a verified
+number, and note that nothing this project measures depends on it: the results
+would read identically if that figure were wrong. The 61.9% line was also
+tightened after review, because an earlier draft rendered it as "a gold-sanity
+gate caught 61.9% of test defects an LLM judge missed," which is slightly
+stronger than what the paper says. The paper reports that the gold solution
+failed 61.9% of generated tests. That is now what this README says.
 
 **What the agent got wrong.** Four claims in earlier drafts were false and were
 caught and corrected before submission: a fabricated experiment result, a
@@ -626,11 +724,31 @@ envguard/
 baseline/baseline.py     the read-only comparison
 evaluation/
   check_corpus.py        proves the answer key by execution
+  check_docs.py          fails if the prose contradicts the committed results
   run_eval.py            runs a version, writes results/<version>.json
-  make_report.py         renders the tables from those results
+  make_report.py         renders the markdown tables from those results
+  make_html_report.py    renders report.html, the human-facing work product
+  report.html            the audit report a reviewer actually reads
+  refutations.py         executes an exploit against every verifier the baseline cleared
   results/               committed raw results, one file per version
 trajectories/            annotated agent runs
+run.sh                   verify | fast | compare | all | demo | report | archive
 ```
+
+**The artifact worth opening is [`evaluation/report.html`](evaluation/report.html).**
+It is the deliverable this system produces for a person: one card per
+environment with the verdict, the recommended action, the exploit source, and
+the concrete inputs where that exploit disagrees with the reference solution. It
+is a single self-contained file with no external assets, it follows the system
+light or dark theme, and it encodes status with a symbol and a word rather than
+colour alone. It also prints its own `MISMATCH` banner on `t15_safe_divide`
+rather than quietly agreeing with itself.
+
+```bash
+./run.sh report          # builds it from the committed results and opens it
+```
+
+That command reads `evaluation/results/*.json` and calls no model.
 
 ## Quick start
 
@@ -638,8 +756,13 @@ trajectories/            annotated agent runs
 git clone https://github.com/Abdullah0157/envguard.git && cd envguard
 python3 envguard/sandbox.py                   # 22 isolation checks
 python3 evaluation/check_corpus.py            # prove the answer key
-python3 evaluation/run_eval.py --version v3   # perfect score, ~7s
+python3 evaluation/check_docs.py              # prove this README matches the results
+python3 evaluation/run_eval.py --version v3   # 8/9, 0 false alarms, 0.94, ~7s
+./run.sh report                               # open the HTML audit report
 ```
+
+Working from the submitted archive instead of a clone? Unzip it and start at
+line two. Nothing below depends on the clone.
 
 **Those three commands need Python 3 and nothing else.** No API key, no
 `pip install`, no virtual environment, no model download, no network. The
@@ -674,12 +797,21 @@ result **exactly**: identical confusion matrix, identical rates, and identical
 verdicts on all 15 environments.
 
 ```
-[ok] true_positives   8    [ok] recall            1.00
-[ok] false_positives  0    [ok] specificity       1.00
-[ok] true_negatives   7    [ok] precision         1.00
-[ok] false_negatives  0    [ok] balanced_accuracy 1.00
-[ok] all 15 per-task verdicts identical
+[ok] true_positives       8        (committed 8)
+[ok] false_positives      0        (committed 0)
+[ok] true_negatives       6        (committed 6)
+[ok] false_negatives      1        (committed 1)
+[ok] recall               0.8889   (committed 0.8889)
+[ok] specificity          1.0      (committed 1.0)
+[ok] precision            1.0      (committed 1.0)
+[ok] balanced_accuracy    0.9444   (committed 0.9444)
+[ok] 15/15 per-task verdicts identical
+     differing: none
 ```
+
+The one false negative is `t15_safe_divide`, the known miss described above. It
+reproduces as a miss, which is the point: the published result is 8/9 and a
+fresh machine gets 8/9.
 
 The deterministic path depends on no wall clock, no randomness, and no network,
 which is why it reproduces byte for byte. Full method and output under

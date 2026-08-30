@@ -24,10 +24,14 @@ import urllib.request
 from dataclasses import dataclass
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-DEFAULT_MODEL = os.environ.get("ENVGUARD_MODEL", "qwen3:8b")
+# qwen3:4b, not 8b. Every committed result in evaluation/results/ was produced
+# with 4b, so this default is what makes those results reproducible with no
+# environment variable set. 8b also swaps on a 16 GB machine, which is the
+# hardware this was built on. Override with ENVGUARD_MODEL if you want 8b.
+DEFAULT_MODEL = os.environ.get("ENVGUARD_MODEL", "qwen3:4b")
 
 # Models measured on this task, 2026-08-28. See README for the comparison.
-KNOWN_MODELS = ("qwen3:8b", "qwen3:4b", "llama3.2:3b")
+KNOWN_MODELS = ("qwen3:4b", "qwen3:8b", "llama3.2:3b")
 
 REQUEST_TIMEOUT_S = 300
 MAX_RETRIES = 3

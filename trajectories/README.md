@@ -40,7 +40,7 @@ misrepresent the system.
 | [`02-template-confirmed.md`](02-template-confirmed.md) | A confirmed defect found with no inference at all. The verifier reads like an ordinary test and the read-only baseline approved it; a deterministic template beats it in under a second, and differential testing proves the exploit is genuinely wrong. |
 | [`03-sanity-gate.md`](03-sanity-gate.md) | An environment that no attacker could ever flag, because its verifier rejects its own reference solution. Only running the reference first reveals it. This is the evidence that justifies stage one of the pipeline. |
 | [`05-baseline-judge.md`](05-baseline-judge.md) | **The comparison the whole project is measured against.** One turn, no tools, and that absence is the variable under test. It reads the same task and verifier the attacker sees, reasons about the weakness accurately, and still concludes the environment is fine. |
-| [`04-coding-agent.md`](04-coding-agent.md) | **The coding agent that built this repository.** Five checkpoints where a tool response or a committed artefact contradicted the agent and changed the design: the harness bypass, a wrong answer key, a false confirmation, a fabricated measurement, and a conclusion that its own later data reversed. |
+| [`04-coding-agent.md`](04-coding-agent.md) | **The coding agent that built this repository.** Seven checkpoints where a tool response or a committed artefact contradicted the agent and changed the design: the harness bypass, a wrong answer key, a false confirmation, a fabricated measurement, a conclusion its own later data reversed, three defects found by external reviewers, and documentation that described a system the code no longer was. |
 
 ---
 

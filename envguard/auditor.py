@@ -21,9 +21,20 @@ running this same module with stages progressively enabled. The measured
 contribution of each stage therefore comes from one codebase, not from four
 divergent snapshots.
 
-A CONFIRMED_HACKABLE verdict ships a working exploit as evidence, so it cannot
-be a false alarm. Uncertainty is confined to SUSPECTED, which is the queue a
-human reviews. Nothing here edits, deletes, or ships an environment by itself.
+A CONFIRMED_HACKABLE verdict ships a working exploit as evidence: a program that
+was executed, passed the verifier, and observably disagreed with the reference
+solution on a concrete input. Most uncertainty is confined to SUSPECTED, which is
+the queue a human reviews. Nothing here edits, deletes, or ships an environment
+by itself.
+
+An earlier version of this docstring claimed a CONFIRMED_HACKABLE verdict could
+not be a false alarm. That is withdrawn. It was falsified by a reviewer, and it
+is unachievable in principle for a second reason: differential.py treats
+solution.py as the oracle, so an environment whose reference is wrong in the same
+direction as its verifier will convict a correct candidate and attach real proof.
+The sanity gate catches a reference that fails its own verifier; nothing here
+catches a reference that agrees with a wrong verifier. See README.md under
+"Limitations".
 """
 
 from __future__ import annotations

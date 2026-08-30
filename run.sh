@@ -7,13 +7,15 @@
 #   ./run.sh compare    baseline vs envguard, then regenerate the report tables
 #   ./run.sh all        every changelog version, start to finish
 #   ./run.sh demo       show one broken environment being cheated, end to end
+#   ./run.sh report     build and open the HTML audit report (no model needed)
 #   ./run.sh archive    build a submission archive from the committed tree
 #
 set -euo pipefail
 cd "$(dirname "$0")"
 
 PY="${PYTHON:-python3}"
-MODEL="${ENVGUARD_MODEL:-qwen3:8b}"
+# Must match envguard/llm.py DEFAULT_MODEL. Every committed result used 4b.
+MODEL="${ENVGUARD_MODEL:-qwen3:4b}"
 
 banner() { printf '\n\033[1m== %s ==\033[0m\n' "$1"; }
 
@@ -33,6 +35,8 @@ cmd_verify() {
   "$PY" envguard/sandbox.py
   banner "corpus answer key, proven by execution"
   "$PY" evaluation/check_corpus.py
+  banner "documentation against the committed evidence"
+  "$PY" evaluation/check_docs.py
   banner "model client"
   need_ollama
   "$PY" envguard/llm.py
@@ -97,6 +101,16 @@ print(f"\n{report.attacks_executed} candidates executed in {report.duration_s}s,
 PY
 }
 
+cmd_report() {
+  banner "building the HTML audit report"
+  # This is the human-facing work product: one page per environment with the
+  # verdict, the action, the exploit source, and the inputs where the exploit
+  # disagrees with the reference. It reads the committed result files, so it
+  # needs no model and no network, and it renders the known t15 miss as a
+  # MISMATCH rather than hiding it.
+  "$PY" evaluation/make_html_report.py --open
+}
+
 cmd_archive() {
   banner "building submission archive"
   # git archive exports exactly the committed tree: no .git, no __pycache__, no
@@ -126,6 +140,7 @@ case "${1:-fast}" in
   compare) cmd_compare ;;
   all)     cmd_all ;;
   demo)    cmd_demo ;;
+  report)  cmd_report ;;
   archive) cmd_archive ;;
-  *) echo "usage: $0 {verify|fast|compare|all|demo|archive}" >&2; exit 1 ;;
+  *) echo "usage: $0 {verify|fast|compare|all|demo|report|archive}" >&2; exit 1 ;;
 esac

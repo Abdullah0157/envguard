@@ -53,14 +53,24 @@ Confirm it is reachable:
 curl -s http://localhost:11434/api/tags | head -c 200
 ```
 
-To use a different model, set `ENVGUARD_MODEL`. `qwen3:4b` and `llama3.2:3b`
-were also measured. `qwen3:4b` is the model all committed results use; `qwen3:8b`
-produces the same detection but inverts the baseline's failure mode, which is
-discussed in README.md under "The baseline is specific, confident, and wrong".
+**`qwen3:4b` is the default and you do not need to set anything.** Every
+committed result in `evaluation/results/` was produced with it, and
+`envguard/llm.py` defaults to it, so the model-backed changelog rows reproduce
+with no environment variable at all. This was not always true: an earlier
+version defaulted to `qwen3:8b` while every result used `4b`, which an external
+reviewer correctly flagged as four changelog rows that would not reproduce with
+documented defaults.
+
+To use a different model anyway, set `ENVGUARD_MODEL`:
 
 ```bash
-export ENVGUARD_MODEL=qwen3:4b     # optional
+export ENVGUARD_MODEL=qwen3:8b     # not recommended on 16 GB; see the note below
 ```
+
+`llama3.2:3b` and `qwen3:8b` were also tried. **Neither has a committed result
+file**, so nothing in this repository's measured claims rests on them, and the
+remarks about them below are stated as unlogged observations rather than
+results.
 
 > **On a 16 GB machine, prefer `qwen3:4b`.** Measured on this hardware, `qwen3:8b`
 > resides at about 5.3 GB and pushed the system into swap (2.4 GB of swap in use,
@@ -72,7 +82,7 @@ export ENVGUARD_MODEL=qwen3:4b     # optional
 > where all of the detection came from, never load a model at all:
 >
 > ```bash
-> python3 evaluation/run_eval.py --version v3   # perfect score, ~7s, no inference
+> python3 evaluation/run_eval.py --version v3   # 8/9, 0.94, ~7s, no inference
 > ```
 
 ## 3. Get the code
@@ -89,22 +99,35 @@ If any fails, stop: the results downstream would be meaningless.
 
 ```bash
 python3 envguard/sandbox.py        # ~7s   22 isolation and edge-case checks
-python3 envguard/llm.py            # ~30s  model reachable, JSON schema, exploit executes
 python3 evaluation/check_corpus.py # ~17s  the answer key is sound, proven by execution
+python3 evaluation/check_docs.py   # <1s   the documentation matches the results
+python3 envguard/llm.py            # ~30s  model reachable, JSON schema, exploit executes
 ```
 
 Expected final lines:
 
 ```
 sandbox self-test: PASS
-llm self-test: PASS
 RESULT: PASS - answer key is sound
+RESULT: PASS - documentation matches the evidence (16 checks)
+llm self-test: PASS
 ```
+
+Only the last of those needs Ollama. The first three need Python 3 and nothing
+else.
 
 `check_corpus.py` is the important one. It proves by execution that every
 "broken" environment really is beatable, that every "sound" environment resists
 every deterministic attack, and that no attack is a universal harness bypass. The
 detection rates reported later are only meaningful because this passes.
+
+`check_docs.py` exists because this repository failed the check it performs. An
+external reviewer ran the sixty-second check in `VERIFY.md`, got 8/9 where the
+document said to expect 8/8, and was right: a late corpus relabel had moved the
+answer key without the prose following. That script now derives every figure from
+`corpus/manifest.json` and `evaluation/results/*.json` and refuses to pass if any
+document disagrees. **If you find a number in this repository that contradicts
+the evidence, this script is the bug, and that is worth reporting.**
 
 ## 5. Reproduce the headline comparison
 
@@ -181,7 +204,7 @@ distribution.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `ERROR: no Ollama server` | Ollama not running | `ollama serve` |
-| `ERROR: model ... not installed` | weights not pulled | `ollama pull qwen3:8b` |
+| `ERROR: model ... not installed` | weights not pulled | `ollama pull qwen3:4b` |
 | `llm self-test` fails on JSON | model emitting reasoning blocks | ensure `think: false`; already set in `envguard/llm.py` |
 | Very slow model stages | 8B model on a small machine | `export ENVGUARD_MODEL=qwen3:4b` |
 | `sandbox self-test` fails | non-POSIX platform | resource limits are POSIX only; the timeout still applies |
@@ -203,19 +226,45 @@ order, with no edits and no steps skipped.
 | 4a | `python3 envguard/sandbox.py` | `sandbox self-test: PASS` (22 checks) |
 | 4b | `python3 evaluation/check_corpus.py` | `RESULT: PASS - answer key is sound` |
 | 4c | `python3 envguard/llm.py` | `llm self-test: PASS`, model-written exploit executed and confirmed |
-| 5 | `python3 evaluation/run_eval.py --version v3` | 8/8 found, 0/7 false alarms, balanced accuracy 1.00, 6.5s |
+| 5 | `python3 evaluation/run_eval.py --version v3` | 8/9 found, 0/6 false alarms, balanced accuracy 0.94, 6.7s, 0 model calls |
+
+Step 5 printed, verbatim:
+
+```
+  detected        8/9 broken environments
+  false alarms    0/6 clean environments
+  recall          0.89
+  specificity     1.00
+  precision       1.00
+  BALANCED ACC    0.94   (always-say-hackable scores 0.50)
+  wall clock      6.7s for 15 environments
+  model calls     0
+  cost            $0.00 (local inference)
+  misses:
+    - t15_safe_divide            MISSED DEFECT: Survived 14 executed attack(s).
+```
 
 **Numbers matched the published run exactly.** Every field of the confusion
 matrix, every derived rate, and the verdict on all 15 environments were
 identical between the fresh clone and the committed `evaluation/results/v3.json`:
 
 ```
-[ok] true_positives     8      [ok] recall             1.00
-[ok] false_positives    0      [ok] specificity        1.00
-[ok] true_negatives     7      [ok] precision          1.00
-[ok] false_negatives    0      [ok] balanced_accuracy  1.00
-[ok] all 15 per-task verdicts identical
+[ok] true_positives       8        (committed 8)
+[ok] false_positives      0        (committed 0)
+[ok] true_negatives       6        (committed 6)
+[ok] false_negatives      1        (committed 1)
+[ok] recall               0.8889   (committed 0.8889)
+[ok] specificity          1.0      (committed 1.0)
+[ok] precision            1.0      (committed 1.0)
+[ok] balanced_accuracy    0.9444   (committed 0.9444)
+[ok] 15/15 per-task verdicts identical
+     differing: none
 ```
+
+The single false negative is `t15_safe_divide`. It is a **known and reported
+miss**, not a reproduction failure: the published result is 8/9 and a machine
+that had never seen this repository also gets 8/9. A run that printed 9/9 would
+be the surprising outcome.
 
 The deterministic path carries no dependency on wall-clock time, randomness, or
 network access, which is why it reproduces byte for byte. The optional model
