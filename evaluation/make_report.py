@@ -31,7 +31,7 @@ RESULTS_DIR = os.path.join(ROOT, "evaluation", "results")
 # stronger prompt. It is in the generated table because a reviewer showed the
 # headline gap shrinks a long way against it, and burying that would be the
 # opposite of what this repository claims to do.
-ORDER = ["v0", "v0-hardened", "v1", "v2", "v3", "v4"]
+ORDER = ["v0", "v0-hardened", "v0-reason-first", "v1", "v2", "v3", "v4"]
 
 
 def load_results() -> dict[str, dict]:

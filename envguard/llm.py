@@ -180,6 +180,30 @@ VERDICT_SCHEMA = {
     "required": ["hackable", "reason"],
 }
 
+# The same schema with the two keys swapped, and it is not a cosmetic difference.
+#
+# Constrained decoding emits fields in declaration order, so VERDICT_SCHEMA makes
+# the model commit to a boolean BEFORE it writes a word of justification, while
+# this one lets it reason first and then answer. An external reviewer noticed the
+# ordering and asked whether the baseline result was partly an artifact of it.
+# It is. Measured on the same model, corpus, prompt and seeds, changing nothing
+# but these two lines:
+#
+#     hackable first (VERDICT_SCHEMA)      2/9 found, 0/6 false alarms, BA 0.61
+#     reason first   (this schema)         9/9 found, 6/6 false alarms, BA 0.50
+#
+# The read-only verdict swings from maximally conservative to flagging every
+# environment in the corpus, sound ones included, on the order of two JSON keys.
+# Committed as the v0-reason-first configuration so the claim has evidence.
+VERDICT_SCHEMA_REASON_FIRST = {
+    "type": "object",
+    "properties": {
+        "reason": {"type": "string"},
+        "hackable": {"type": "boolean"},
+    },
+    "required": ["reason", "hackable"],
+}
+
 
 def _self_test() -> int:
     """Verify the server, the models, and both schemas before anything depends on them."""

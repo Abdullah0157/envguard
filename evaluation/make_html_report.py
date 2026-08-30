@@ -217,23 +217,62 @@ def build(results: dict) -> str:
             "anyway would misstate the improvement.</p>"
         )
 
-    # ---- comparison against the baseline
-    if base:
-        bm = base["metrics"]
-        _, b_per = human_minutes(base)
-        parts.append("<h2>Against a reviewer who does not execute</h2><table>")
-        parts.append("<tr><th>Metric</th><th class='num'>Reads only</th>"
-                     "<th class='num'>envguard</th></tr>")
-        for label, b, f in (
-            ("Balanced accuracy", f"{bm['balanced_accuracy']:.2f}", f"{m['balanced_accuracy']:.2f}"),
-            ("Defects found", f"{bm['true_positives']}/{broken}", f"{m['true_positives']}/{broken}"),
-            ("False alarms", f"{bm['false_positives']}/{clean}", f"{m['false_positives']}/{clean}"),
-            ("Reviewer minutes per environment", f"{b_per:.1f}", f"{per_env:.1f}"),
-            ("Cost per environment", "$0.00", "$0.00"),
-        ):
-            parts.append(f"<tr><td>{esc(label)}</td><td class='num'>{esc(b)}</td>"
-                         f"<td class='num'>{esc(f)}</td></tr>")
+    # ---- comparison against every read-only configuration, not just the weakest
+    #
+    # This table used to show v0 alone under the heading "Against a reviewer who
+    # does not execute", which quoted 0.61 against 0.94. That is the exact
+    # comparison README.md spends a section retracting, so the best artifact in
+    # the submission was leading with the project's least defensible claim. A
+    # reviewer found it. Every committed read-only configuration is shown now, so
+    # this file cannot drift from the correction again.
+    readonly = [
+        (v, results[v]) for v in ("v0", "v0-hardened", "v0-reason-first")
+        if v in results and results[v].get("corpus_size") == main.get("corpus_size")
+    ]
+    if readonly:
+        parts.append("<h2>Against reviewers who do not execute</h2><table>")
+        header = "<tr><th>Metric</th>"
+        for v, _ in readonly:
+            header += f"<th class='num'>{esc(v)}</th>"
+        header += "<th class='num'>envguard</th></tr>"
+        parts.append(header)
+
+        def cells(fn):
+            out = ""
+            for _, payload in readonly:
+                out += f"<td class='num'>{esc(fn(payload))}</td>"
+            return out
+
+        specs = [
+            ("Balanced accuracy", lambda p: f"{p['metrics']['balanced_accuracy']:.2f}",
+             f"{m['balanced_accuracy']:.2f}"),
+            ("Defects found", lambda p: f"{p['metrics']['true_positives']}/{broken}",
+             f"{m['true_positives']}/{broken}"),
+            ("False alarms", lambda p: f"{p['metrics']['false_positives']}/{clean}",
+             f"{m['false_positives']}/{clean}"),
+            ("Reviewer minutes per environment", lambda p: f"{human_minutes(p)[1]:.1f}",
+             f"{per_env:.1f}"),
+            ("Cost per environment", lambda p: "$0.00", "$0.00"),
+        ]
+        for label, fn, mine in specs:
+            parts.append(f"<tr><td>{esc(label)}</td>{cells(fn)}"
+                         f"<td class='num'>{esc(mine)}</td></tr>")
         parts.append("</table>")
+
+        best = max(readonly, key=lambda kv: kv[1]["metrics"]["balanced_accuracy"])
+        parts.append(
+            "<p class='caption'><strong>Read this table sceptically, which is how it "
+            "is meant to be read.</strong> An external reviewer showed that most of "
+            "the original headline gap was a property of the <code>v0</code> prompt "
+            "rather than of execution, and reached 0.83 with their own read-only "
+            f"prompt. The strongest configuration here is <code>{esc(best[0])}</code> "
+            f"at {best[1]['metrics']['balanced_accuracy']:.2f}. The defensible gap is "
+            "roughly 0.83 to 0.94, not the 0.61 to 0.94 this project first reported. "
+            "<code>v0-reason-first</code> is <code>v0</code> with two output-schema "
+            "keys swapped and nothing else changed, which is included because a "
+            "verdict that moves that far on a detail carrying no meaning is the "
+            "point. See README.md under Results.</p>"
+        )
         parts.append(
             f"<p class='caption'>Reviewer time assumes {CONFIRM_WITH_EVIDENCE_MIN:.0f} "
             f"minutes to confirm a verdict that carries an executed exploit, and "

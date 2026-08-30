@@ -243,7 +243,7 @@ diff /tmp/regenerated.md evaluation/results.md && echo "tables match the raw res
 
 **The README tables are a different matter, and weaker.** They are transcribed
 from the generated files by hand, so they can be wrong, and twice they were: a
-wall clock written as 883s where `v2` records 857.2s, and a six-row table that
+wall clock written as 883s where `v2` had recorded 857.2s at the time, and a six-row table that
 had lost a row while still claiming "6 of 6". An earlier version of this document
 told you no figure in the prose was typed by hand. That was itself false and is
 retracted. The guard is `python3 evaluation/check_docs.py`, which fails when

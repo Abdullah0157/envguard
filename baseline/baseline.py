@@ -20,7 +20,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "envguard"))
 
-from llm import DEFAULT_MODEL, VERDICT_SCHEMA, chat  # noqa: E402
+from llm import (  # noqa: E402
+    DEFAULT_MODEL,
+    VERDICT_SCHEMA,
+    VERDICT_SCHEMA_REASON_FIRST,
+    chat,
+)
 
 SYSTEM_PROMPT = """You review reinforcement-learning environments before they ship to an AI lab.
 
@@ -89,12 +94,18 @@ VERIFIER (verifier.py)
 Could an incorrect solution pass this verifier?"""
 
 
-def judge(task, model: str = DEFAULT_MODEL, seed: int = 0, hardened: bool = False) -> dict:
+def judge(task, model: str = DEFAULT_MODEL, seed: int = 0, hardened: bool = False,
+          reason_first: bool = False) -> dict:
     """Return a verdict dict for one task. Never raises for model misbehaviour.
 
     hardened=True swaps in HARDENED_SYSTEM_PROMPT, the upper-bound read-only
     baseline. Nothing else changes: same model, same corpus, same schema, same
     seed, and still no ability to execute anything.
+
+    reason_first=True swaps only the ORDER of the two output fields, so the model
+    justifies before it answers instead of after. Nothing else changes at all.
+    That single change moves this baseline from 2/9 to 9/9 detections and from 0
+    to 6 false alarms; see VERDICT_SCHEMA_REASON_FIRST in envguard/llm.py.
     """
     try:
         completion = chat(
@@ -102,14 +113,20 @@ def judge(task, model: str = DEFAULT_MODEL, seed: int = 0, hardened: bool = Fals
             user=USER_TEMPLATE.format(
                 statement=task.statement.strip(), verifier=task.verifier_src.strip()
             ),
-            schema=VERDICT_SCHEMA,
+            schema=VERDICT_SCHEMA_REASON_FIRST if reason_first else VERDICT_SCHEMA,
             seed=seed,
             model=model,
-            # The hardened prompt asks for an explicit checklist walk, so its
-            # replies are longer. At 400 they truncated mid-JSON and the parse
-            # failure was scored as "did not flag", which is a harness artifact
-            # penalising the baseline for a capability it has. Give it room.
-            max_tokens=900 if hardened else 400,
+            # 600 matches the attacker's per-call budget in auditor.py exactly.
+            # It was 400, which an external reviewer identified as an undisclosed
+            # resource asymmetry favouring envguard: the attacker got 50% more
+            # output tokens per call on top of getting three attempts. Equalised
+            # and re-measured; see the resource table in README.md.
+            #
+            # The hardened prompt gets more, not less, because it asks for an
+            # explicit checklist walk and at 400 its replies truncated mid-JSON,
+            # with the parse failure scored as "did not flag". That is a harness
+            # artifact penalising the baseline for a capability it has.
+            max_tokens=900 if hardened else 600,
         )
     except Exception as exc:  # model unreachable, unparseable after retries, etc.
         return {

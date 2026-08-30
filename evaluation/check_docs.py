@@ -253,6 +253,109 @@ def main() -> int:
             f"ratios {sorted(ratios)}",
         )
 
+    # -------------------------------------------------- wall-clock operands
+    # Every re-run rewrites wall_clock_s, so any second-value typed into prose
+    # goes stale silently. This has happened twice: "883s" when v2 recorded
+    # 857.2s, and later "857.2s versus 7.3s" after v2 and v3 were re-measured at
+    # 790.0s and 6.8s. Both were caught by reviewers rather than by this file.
+    #
+    # A value is checked against the wall clock of the version NAMED ON THE SAME
+    # LINE, not against the set of all of them. The first version of this check
+    # matched against any committed run and passed a reintroduced "857.2s" for v2
+    # (true value 790.0s) and a "72s" for v0 (true value 92.2s), because with
+    # seven runs spanning 7s to 1064s almost any number is close to something.
+    # That was found by reintroducing the defect, not by reading the code.
+    SECONDS = re.compile(r"(?<![\w.])(\d{1,5}(?:\.\d)?)s(?![\w])")
+    VERSION = re.compile(r"`?(v\d[\w-]*)`?")
+    HISTORICAL = re.compile(
+        r"(earlier|stale|was false|at the time|previously|used to|superseded|"
+        r"recorded at the time|has since|transcription)", re.I
+    )
+    for name in DOCS:
+        text = read(name)
+        bad = []
+        # Column headers carry the version for every row beneath them. Without
+        # this, a row like "| Machine time | 72s | 391s | 7s |" names no version
+        # and escapes the check entirely, which is how a stale 72s for v0 slipped
+        # through the first version of it.
+        #
+        # A row counts as a header only when the NEXT line is the |---| separator.
+        # Without that test a data row mentioning `v2` was mistaken for a header,
+        # and the stale operand inside it was skipped. Found by reintroducing both
+        # defects at once and watching only one of them get caught.
+        lines = text.splitlines()
+        separator = re.compile(r"^\s*\|[\s|:-]+\|\s*$")
+        column_versions: list[list[str]] = []
+        for number, line in enumerate(lines):
+            stripped = line.strip()
+            is_row = stripped.startswith("|") and stripped.endswith("|")
+            if not is_row:
+                column_versions = []
+                continue
+            if separator.match(line):
+                continue
+
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            is_header = number + 1 < len(lines) and separator.match(lines[number + 1])
+            if is_header:
+                column_versions = [
+                    [v for v in VERSION.findall(c) if v in wall] for c in cells
+                ]
+                continue
+
+            # A document may quote a superseded figure while narrating the bug it
+            # caused, the same exemption the detection-rate check uses. It has to
+            # say so on the line, which keeps the escape hatch narrow.
+            if HISTORICAL.search(line):
+                continue
+
+            inline = [v for v in VERSION.findall(line) if v in wall]
+            for index, cell in enumerate(cells):
+                scope = inline or (
+                    column_versions[index] if index < len(column_versions) else []
+                )
+                if not scope:
+                    continue
+                targets = [wall[v] for v in scope]
+                for match in SECONDS.finditer(cell):
+                    value = float(match.group(1))
+                    # 8% covers rounding (6.8 written as 7, 790.0 as 790) and not
+                    # the 67-second drift a stale operand produces.
+                    if not any(abs(value - t) <= max(1.0, 0.08 * t) for t in targets):
+                        bad.append((value, scope))
+
+        # Prose outside tables, scoped to the LINE.
+        #
+        # Paragraph scoping was tried and reverted. It caught one more real case
+        # but produced false positives: a paragraph naming v2 and v4 legitimately
+        # quotes v3's 7s, and a note about 8B swap outliers mentions 200s next to
+        # an unrelated v3 reference. A documentation gate that fails on correct
+        # prose gets switched off, and then it protects nothing, so this one
+        # prefers a known gap over a false alarm.
+        #
+        # KNOWN GAP, stated rather than hidden: a figure whose version is named on
+        # a different line of the same sentence is not checked. The table pass
+        # above covers the common case, since that is where operands actually live.
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("|") or HISTORICAL.search(line):
+                continue
+            inline = [v for v in VERSION.findall(line) if v in wall]
+            if not inline:
+                continue
+            targets = [wall[v] for v in inline]
+            for match in SECONDS.finditer(line):
+                value = float(match.group(1))
+                if not any(abs(value - t) <= max(1.0, 0.08 * t) for t in targets):
+                    bad.append((value, inline))
+
+        check(
+            f"{name} quotes no wall clock that disagrees with the named version",
+            not bad,
+            f"found {bad}; committed wall clocks are "
+            f"{ {v: round(w, 1) for v, w in sorted(wall.items())} }",
+        )
+
     # ------------------------------------------------- corpus contamination
     # A reviewer found that t08_days_between's verifier carried a comment stating
     # its own defect in plain English. It was the only commented verifier in

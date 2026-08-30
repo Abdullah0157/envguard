@@ -289,7 +289,16 @@ that had never seen this repository also gets 8/9. A run that printed 9/9 would
 be the surprising outcome.
 
 The deterministic path carries no dependency on wall-clock time, randomness, or
-network access, which is why it reproduces byte for byte. The optional model
+network access, which is why every verdict and every derived rate reproduces
+exactly.
+
+**Not byte for byte, and the distinction matters.** Each result file records a
+`wall_clock_s`, which is machine-dependent, so `evaluation/results/v3.json` will
+differ from the committed copy in that one field on any machine that is not the
+one that produced it. The confusion matrix, every rate, and the verdict on all 15
+environments are identical. An earlier version of this sentence claimed byte-for-
+byte reproduction, which a reviewer correctly called false. Pass `--no-save` if
+you want to check the evidence without altering it. The optional model
 stages are reproducible in distribution rather than exactly, because local
 inference varies with hardware and Ollama version; this is stated in section 8
 and is why the headline result is drawn from the deterministic path.

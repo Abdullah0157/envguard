@@ -45,6 +45,11 @@ CONFIGS = {
     # the weak prompt rather than from execution. This is the honest comparison.
     "v0-hardened": {"mode": "baseline", "hardened": True,
                     "label": "hardened baseline: same reading, much stronger prompt"},
+    # Identical to v0 in every respect except the ORDER of the two output fields.
+    # Not a variant anyone should ship; it exists because a reviewer asked whether
+    # the baseline number was an artifact of schema ordering, and it is.
+    "v0-reason-first": {"mode": "baseline", "reason_first": True,
+                        "label": "v0 with the two output fields swapped, nothing else"},
     "v1": {"mode": "envguard", "sanity": False, "templates": False, "model": True,
            "label": "model writes exploits, every candidate executed"},
     "v2": {"mode": "envguard", "sanity": True, "templates": False, "model": True,
@@ -85,13 +90,15 @@ def score(rows: list[dict]) -> dict:
     }
 
 
-def run_baseline(tasks, model: str, hardened: bool = False) -> list[dict]:
+def run_baseline(tasks, model: str, hardened: bool = False,
+                 reason_first: bool = False) -> list[dict]:
     from baseline import judge  # noqa: PLC0415
 
     rows = []
     for index, task in enumerate(tasks):
         # Same seeds as v0 so the two prompts are compared on identical draws.
-        verdict = judge(task, model=model, seed=1000 + index, hardened=hardened)
+        verdict = judge(task, model=model, seed=1000 + index, hardened=hardened,
+                        reason_first=reason_first)
         rows.append({
             "task_id": task.id,
             "truth_broken": task.broken,
@@ -259,7 +266,8 @@ def main() -> int:
 
     started = time.monotonic()
     if config["mode"] == "baseline":
-        rows = run_baseline(tasks, args.model, hardened=config.get("hardened", False))
+        rows = run_baseline(tasks, args.model, hardened=config.get("hardened", False),
+                            reason_first=config.get("reason_first", False))
     else:
         rows = run_envguard(tasks, config, args.model)
     elapsed = time.monotonic() - started

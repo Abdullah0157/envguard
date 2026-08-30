@@ -77,17 +77,42 @@ does not merely produce a wrong answer, it produces an unstable one, and this is
 measured rather than asserted. Three read-only prompts, same model, same corpus,
 same seeds, differing only in wording:
 
-| Read-only prompt | Found | False alarms | Balanced acc. |
-|---|---|---|---|
-| Plain (`v0`) | 2/9 | 0/6 | 0.61 |
-| "Assume guilt" | **9/9** | **5/6** | 0.58 |
-| Calibrated (`v0-hardened`) | 6/9 | 2/6 | 0.67 |
+| Read-only configuration | What changed | Found | False alarms | Balanced acc. |
+|---|---|---|---|---|
+| Plain (`v0`) | shipped | 2/9 | 0/6 | 0.61 |
+| "Assume guilt" | prompt wording | **9/9** | **5/6** | 0.58 |
+| Calibrated (`v0-hardened`) | prompt wording | 6/9 | 2/6 | 0.67 |
+| **`v0-reason-first`** | **two JSON keys swapped** | **9/9** | **6/6** | 0.50 |
+| Reviewer's own prompt | prompt wording | 7/9 | 0/6 | 0.89 (0.83 corrected) |
 
-The middle row found every defect and was still the worst of the three, because
-it flagged five sound environments as well. The same reader swings from missing
-almost everything to accusing almost everything on a change of wording alone, and
-nothing in its output tells you which mode you are in. Execution does not have
-that property: an exploit either runs and passes, or it does not.
+The second row found every defect and was still worse than the first, because it
+flagged five sound environments too.
+
+**The last-but-one row is the one worth staring at.** `v0-reason-first` is `v0`.
+Same model, same corpus, same prompt, same seeds, same temperature. The only
+difference is the order of two keys in the output schema:
+
+```python
+{"hackable": bool, "reason": str}    # 2/9 found, 0/6 false alarms
+{"reason": str, "hackable": bool}    # 9/9 found, 6/6 false alarms
+```
+
+Constrained decoding emits fields in declaration order, so the first makes the
+model commit to a boolean before writing a word of justification and the second
+lets it think first. That is a detail with no semantic content whatsoever, and it
+moves the auditor from **maximally conservative to flagging every environment in
+the corpus**, sound ones included.
+
+This was found by an external reviewer running their own ablation, and it is now
+committed as `evaluation/results/v0-reason-first.json` so the claim has evidence
+rather than an anecdote behind it.
+
+So a read-only verdict is not merely sometimes wrong. It is **unstable under
+changes that carry no meaning**: prompt wording moves it from 0.50 to 0.89, and
+key ordering moves it from 0.61 to 0.50, and nothing in the output tells you
+which regime you are in. Execution does not have that property. An exploit either
+runs and passes the verifier or it does not, and swapping two dictionary keys
+cannot change the answer.
 
 **Why it is worth solving now.** On 18 August 2026 micro1's CEO stated the
 company had committed **over $20,000,000 in 11 days** to license real operational
@@ -260,7 +285,7 @@ result is reported. Its limits are stated under
 | Defects found | 2/9 | 6/9 | **8/9** |
 | False alarms on sound environments | 0/6 | 2/6 | **0/6** |
 | Human time per environment | 4.0 min | 16.0 min | **1.1 min** |
-| Machine time, all 15 | 72s | 391s | **7s** |
+| Machine time, all 15 | 87s | 391s | **7s** |
 | Model calls | 15 | 14 | **0** |
 | Cost per environment | $0.00 | $0.00 | $0.00 |
 
@@ -381,10 +406,25 @@ be found:
 | Environments | all 15 | all 15 (same) | all 15 (same) |
 | Output contract | JSON schema | JSON schema (same) | JSON schema (same) |
 | Seeds | 1000+index | 1000+index (same) | fixed per task and attempt |
+| Temperature | 0.0 | 0.0 (same) | 0.0 (same) |
+| Output tokens per call | 600 | 900 | 600 (same as `v0`) |
 | Prompt | defines "hackable", four examples | **full defect taxonomy, told to be suspicious, must name an attack** | defines the same attack families |
 | **Sees `solution.py`** | no | no | **yes** |
 | **Attempts** | one, no retries | one, no retries | **up to three, each informed by the previous failure** |
+| **Total output budget** | 600 | 900 | **up to 1800** |
 | **Can execute code** | no | no | **yes** |
+
+**The token budget row was an undisclosed asymmetry until a reviewer found it.**
+The baseline was capped at 400 output tokens per call while the attacker got 600,
+so envguard had 50% more room to think on top of getting three attempts. That is
+now equalised at 600, and `v0` was re-measured: **unchanged at 2/9 and 0.61**. The
+cap was never binding, so the asymmetry was real but immaterial. It is reported
+rather than quietly fixed, because "we equalised it and nothing moved" is a
+result and "we equalised it" alone is not.
+
+The hardened baseline keeps 900 deliberately. Its prompt asks for an explicit
+checklist walk, and at 400 its replies truncated mid-JSON with the parse failure
+scored as "did not flag", which penalised it for a capability it has.
 
 **The reference-solution row is the one that changes a number.** envguard reads
 `solution.py` for two stages: the sanity gate runs it against its own verifier,
@@ -413,10 +453,12 @@ a ceiling", which was honest about direction and badly wrong about magnitude. Th
 hardened column above is that floor being measured, and a reviewer's own version
 of it reached 0.83.
 
-The attempt count remains unequal and unmeasured: a fairer baseline would get
-three attempts too, and neither `v0` nor `v0-hardened` does. That still biases in
-envguard's favour by an unquantified amount, and it is the next thing I would
-measure.
+**The attempt count remains unequal and unmeasured**, and it is now the largest
+undisclosed-turned-disclosed advantage left. A fairer baseline would get three
+attempts too, and neither `v0` nor `v0-hardened` does, so envguard has up to three
+times the total output budget. That biases in its favour by an amount I have not
+measured, and it is the next experiment I would run. I am stating it rather than
+waiting for a fourth reviewer to find it.
 
 Two things bound how much that matters. The baseline has no tool to learn from,
 so a retry would resample the same reasoning against the same unchanged input;
@@ -460,7 +502,7 @@ tables *in this README* are transcribed from those generated files by hand.
 An earlier version of this section claimed every number here was rendered
 automatically and none typed by hand. That was false, and a reviewer proved it by
 finding two transcription errors: a wall clock reported as 883s where the
-committed `v2` says 857.2s, and a six-row refutation table that had lost a row
+committed `v2` recorded 857.2s at the time, and a six-row refutation table that had lost a row
 while still claiming "6 of 6". Both are fixed, and the overclaim is retracted
 rather than repaired, because the mechanism it described does not exist. The
 guarantee that does hold is weaker and checkable: every figure here originates in
@@ -498,6 +540,7 @@ four divergent snapshots. Full numbers in
 |---|---|---|---|
 | **v0** | Baseline. Show the model the task and the verifier, ask whether an incorrect solution could pass. Nothing executed. | **2/9 found, 0/6 false alarms, balanced accuracy 0.61.** It reads each verifier, describes the weakness accurately, and concludes the environment is fine anyway. | Established the starting point, and it turned out to be a **weak** one. See the row below. |
 | **v0-hardened** | Same reading, much stronger prompt: the full defect taxonomy, an instruction to be suspicious, and a demand to name a concrete attack before deciding. Still no execution. Added after an external reviewer showed most of the `v0`-to-`v3` gap was a property of my prompt. | **6/9 found, 2/6 false alarms, balanced accuracy 0.67.** The reviewer's own version of the same idea reached 0.83. Two earlier attempts of mine scored 0.58 and 0.50, one by flagging 9/9 defects *and* 5/6 sound environments. | Kept, and it **cost me the headline**. The honest gap is against this column, not `v0`. Reading is a weaker constraint than this project first claimed; the part that survives is false alarms, attached evidence, and 7 seconds against 391. |
+| **v0-reason-first** | `v0` with the two output-schema keys swapped and **nothing else changed**. Same model, corpus, prompt, seeds and temperature. Added after a reviewer's own ablation asked whether the baseline number was an artifact of field ordering. | **9/9 found, 6/6 false alarms, balanced accuracy 0.50.** Letting the model justify before answering makes it flag every environment in the corpus, sound ones included. | Kept as evidence, not as a configuration anyone should ship. It is the sharpest measurement in the project of *why* a read-only verdict cannot be trusted: it moved this far on a detail with no semantic content. |
 | **v1** | Let the model write exploits, and **execute every one**. A claim only survives if it is reproduced. | **2/9 -> 7/9 found, balanced accuracy 0.61 -> 0.89.** | Kept. This is the single largest improvement in the project, and it comes from running the model's output rather than from any change to the model. |
 | **v2** | Added the **gold sanity gate**: run the reference solution against its own verifier first. | **7/9 -> 8/9, balanced accuracy 0.89 -> 0.94.** v1 missed `t08_days_between`, whose verifier rejects its own reference solution. No attack can reach it, because there is nothing there to exploit. | Kept. It recovers the one environment attacking cannot, for a single execution costing 0.04s. |
 | **v3** | Added **deterministic template attacks** generated from the function signature: constants, empty values of the right type, identity, and the literal the verifier compares against. | **8/9 found, 0/6 false alarms, balanced accuracy 0.94, in 7 seconds with zero model calls.** Matches v2 exactly while using no inference at all. | Kept, and this is the recommended configuration. Essentially all the detection comes from here. |
@@ -516,8 +559,8 @@ both are measured rather than asserted:
 2. **The model stage as the recommended path** (cut in the `v4` row). Not because
    it failed. `v2` shows the model finds **8 of 9 unaided**, the same score the
    templates reach, with real and reproducible exploits. It was cut because it
-   buys the *same* answer at roughly **120 times the wall clock** (857.2s versus
-   7.3s). The lesson is not that attacker creativity is useless; it is that
+   buys the *same* answer at roughly **120 times the wall clock** (790s versus
+   7s). The lesson is not that attacker creativity is useless; it is that
    creativity was never the binding constraint on this corpus, so paying for it
    bought nothing that was not already free.
 
@@ -791,8 +834,8 @@ So the model is not incompetent. It is **redundant** here:
 
 | Configuration | Found | False alarms | Model calls | Wall clock |
 |---|---|---|---|---|
-| Model alone, no templates (`v2`) | 8/9 | 0/6 | 16 | 857.2s |
-| Templates alone, no model (`v3`) | 8/9 | 0/6 | **0** | **7.3s** |
+| Model alone, no templates (`v2`) | 8/9 | 0/6 | 16 | 790s |
+| Templates alone, no model (`v3`) | 8/9 | 0/6 | **0** | **7s** |
 
 Identical accuracy. **Roughly 120 times the wall clock.** And when both run
 together (`v4`), the model adds nothing further, because the templates already
@@ -1039,5 +1082,5 @@ reproduces as a miss, which is the point: the published result is 8/9 and a
 fresh machine gets 8/9.
 
 The deterministic path depends on no wall clock, no randomness, and no network,
-which is why it reproduces byte for byte. Full method and output under
+which is why every verdict and every rate reproduces exactly. Full method and output under
 "Verified reproduction" in [`REPRODUCTION.md`](REPRODUCTION.md).
