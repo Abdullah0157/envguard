@@ -234,9 +234,31 @@ rows rather than assert them, so it cannot contradict its own table again.
 `capture.py` now reads the model and seed out of `v0.json` and aborts rather than
 render a trajectory that disagrees with the result it documents.
 
-**Reproduce this:** `python3 evaluation/check_docs.py` (16 checks). It was
-validated by reintroducing all three reviewer findings into a scratch copy and
-confirming it fails on five checks, then removing them and confirming it passes.
+**Reproduce this:** `python3 evaluation/check_docs.py` (24 checks). It was
+validated by reintroducing every finding from both review rounds into a scratch
+copy and confirming it fails on each: 8 of 24 checks fail with them present, and
+all 24 pass with them removed.
+
+**And then the same reviewer came back and found the checker was too narrow.** A
+second pass turned up residue the first fix had not reached: `126x`, `~120x` and
+the true `117x` all coexisting in one README, and the retracted "no number typed
+by hand" claim still asserted in `VERIFY.md`, `REPRODUCTION.md` and
+`make_report.py`'s docstring after being withdrawn in the README. Same defect as
+the original, one layer down: a correction applied in one file and not
+propagated, in a repository that by then had a tool for exactly that.
+
+So the checker grew two more invariants, one per defect class: no document may
+assert the retracted provenance claim except where it is being withdrawn, and
+every "N times slower" multiplier must be within 2% of a real ratio between two
+committed wall clocks.
+
+The second of those is worth a note, because **testing the check found a bug in
+the check.** The first tolerance was 5%, which let a claimed `94x` pass against a
+true `97x`. That is precisely the near-miss the check exists to catch, and it was
+found only by reintroducing the defect and watching the checker fail to notice.
+Tightened to 2%, it catches it. A test that has never been shown to fail is not
+evidence, which is the same argument this project makes about verifiers, arrived
+at for the third time.
 
 The retracted guarantee is also finally gone from the last place it was still
 asserted. `README.md` had withdrawn "a confirmed verdict cannot be a false alarm"

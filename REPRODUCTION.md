@@ -87,14 +87,31 @@ results.
 
 ## 3. Get the code
 
+**If you have the submitted archive, use it. It is the artifact.** It is a
+`git archive` of the exact commit, so it contains the committed tree and nothing
+else: no `.git`, no `__pycache__`, no local scratch files. Everything below works
+from it, and nothing below needs a network connection.
+
+```bash
+unzip envguard-<sha>.zip
+cd envguard-<sha>
+```
+
+A clone works too, if you have access to the repository:
+
 ```bash
 git clone https://github.com/Abdullah0157/envguard.git
 cd envguard
 ```
 
+> The repository may be private, in which case that clone will return 404 and
+> **that is not a problem for reproducing anything**. Every command in this
+> document runs from the unzipped archive. The clone is only useful if you want
+> to inspect the commit history.
+
 ## 4. Verify the machinery before trusting any number
 
-Run these three in order. Each is fast and each guards a different assumption.
+Run these in order. Each is fast and each guards a different assumption.
 If any fails, stop: the results downstream would be meaningless.
 
 ```bash
@@ -109,7 +126,7 @@ Expected final lines:
 ```
 sandbox self-test: PASS
 RESULT: PASS - answer key is sound
-RESULT: PASS - documentation matches the evidence (16 checks)
+RESULT: PASS - documentation matches the evidence (24 checks)
 llm self-test: PASS
 ```
 
@@ -139,8 +156,13 @@ python3 evaluation/make_report.py --write     # regenerate evaluation/results.md
 
 Each writes `evaluation/results/<version>.json` containing every per-task
 verdict, the exploit source where one was found, and the confusion matrix.
-`make_report.py` renders the tables used in `README.md`, so no number in the
-prose is typed by hand.
+`make_report.py` renders `evaluation/results.md` from those files, and that file
+is diffable against what is committed.
+
+It does **not** render `README.md`. The README tables are transcribed by hand and
+have been wrong twice, so an earlier version of this sentence, claiming no number
+in the prose was typed by hand, was false and is retracted. `check_docs.py` is
+the guard that replaced it.
 
 ## 6. Reproduce the full improvement changelog
 

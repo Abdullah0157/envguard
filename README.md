@@ -10,6 +10,31 @@ Built for the micro1 Frontier Engineering Challenge, August 2026.
 
 ---
 
+## If you have five minutes
+
+This file is long because the argument is checkable and the checks are written
+out. If you are skimming, read these five things in this order:
+
+1. **Run it.** `python3 evaluation/run_eval.py --version v3` takes 7 seconds,
+   needs nothing but Python 3, and prints the headline: **8/9 defects found, 0/6
+   false alarms, balanced accuracy 0.94, zero model calls.**
+2. **[The result table](#results)** and what it is compared against, including
+   [the two ways the comparison favours envguard](#where-the-two-sides-differ-in-resources).
+3. **[The defect this system cannot find](#the-defect-this-system-cannot-find).**
+   One defect is missed by every configuration. It was found by an external
+   reviewer in an environment labelled sound here, and deliberately left unfixed,
+   because writing an attack for a known answer measures nothing.
+4. **[The hot take](#hot-take)**: the model was redundant on this corpus, and the
+   load-bearing component was execution rather than intelligence. That conclusion
+   is the opposite of the one this project set out expecting.
+5. **[`VERIFY.md`](VERIFY.md)** pairs every claim here with the command that
+   would disprove it, including `python3 evaluation/check_docs.py`, which fails
+   if this README contradicts the committed results.
+
+Everything else is supporting evidence.
+
+---
+
 ## The user and the bottleneck
 
 **Who.** The engineer responsible for environment quality at an AI data lab, on
@@ -371,7 +396,7 @@ both are measured rather than asserted:
 2. **The model stage as the recommended path** (cut in the `v4` row). Not because
    it failed. `v2` shows the model finds **8 of 9 unaided**, the same score the
    templates reach, with real and reproducible exploits. It was cut because it
-   buys the *same* answer at roughly **120 times the wall clock** (857.2s versus
+   buys the *same* answer at **117 times the wall clock** (857.2s versus
    7.3s). The lesson is not that attacker creativity is useless; it is that
    creativity was never the binding constraint on this corpus, so paying for it
    bought nothing that was not already free.
@@ -607,7 +632,7 @@ So the model is not incompetent. It is **redundant** here:
 | Model alone, no templates (`v2`) | 8/9 | 0/6 | 16 | 857.2s |
 | Templates alone, no model (`v3`) | 8/9 | 0/6 | **0** | **7.3s** |
 
-Identical accuracy. **Roughly 120 times the wall clock.** And when both run
+Identical accuracy. **117 times the wall clock.** And when both run
 together (`v4`), the model adds nothing further, because the templates already
 found everything it would have.
 
@@ -642,7 +667,7 @@ That is the honest division of labour this project actually measured:
 | **The model** | Finding the ones you didn't. It is not a cheaper enumerator; it is the thing that questions your assumptions. |
 
 The mistake would be reading the wall-clock numbers and concluding "drop the
-model." On the work I designed, it was 126 times slower for an identical answer.
+model." On the work I designed, it was 117 times slower for an identical answer.
 On the work I got wrong, it was the only component that caught me.
 
 One caveat I will not paper over: this corpus is small, synthetic, and its defect
@@ -764,7 +789,7 @@ python3 evaluation/run_eval.py --version v3   # 8/9, 0 false alarms, 0.94, ~7s
 Working from the submitted archive instead of a clone? Unzip it and start at
 line two. Nothing below depends on the clone.
 
-**Those three commands need Python 3 and nothing else.** No API key, no
+**Those commands need Python 3 and nothing else.** No API key, no
 `pip install`, no virtual environment, no model download, no network. The
 recommended configuration makes zero inference calls, so the result this project
 most wants checked is also the cheapest one to check.

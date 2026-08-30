@@ -163,6 +163,63 @@ def main() -> int:
             f"does not contain.",
         )
 
+    # ------------------------------------------- the retracted provenance claim
+    # The README once claimed every number in it was machine-rendered. That was
+    # false, and retracting it in one file while three others kept asserting it is
+    # the exact defect this script exists to prevent. So the retraction is an
+    # invariant: the claim may appear only where it is being withdrawn.
+    RETRACTED = re.compile(
+        r"(no (?:number|figure)[^.\n]{0,60}typed by hand"
+        r"|not? typed by hand"
+        r"|every number[^.\n]{0,40}(?:is )?(?:rendered|generated)[^.\n]{0,30}by)",
+        re.I,
+    )
+    WITHDRAWN_NEARBY = re.compile(
+        r"(retract|withdraw|was false|earlier version|no longer|does not exist|overclaim)",
+        re.I,
+    )
+    for name in (*DOCS, os.path.join("evaluation", "make_report.py")):
+        text = read(name)
+        offenders = []
+        for m in RETRACTED.finditer(text):
+            # Look at the surrounding paragraph, not just the line: the retraction
+            # is usually stated in the sentence before or after the quote.
+            lo, hi = max(0, m.start() - 400), min(len(text), m.end() + 400)
+            if not WITHDRAWN_NEARBY.search(text[lo:hi]):
+                offenders.append(text[m.start():m.end()][:70])
+        check(
+            f"{name} does not assert the retracted 'nothing typed by hand' claim",
+            not offenders,
+            f"found {offenders}. That mechanism does not exist: make_report.py "
+            f"generates results.md only, and the README tables are transcribed by "
+            f"hand. State it only where it is being withdrawn.",
+        )
+
+    # -------------------------------------------------------- multiplier claims
+    # "N times slower" is a derived figure like any other, so it is checked like
+    # any other. A reviewer found 126x, ~120x and 117x coexisting in one README.
+    wall = {v: load(v)["totals"]["wall_clock_s"] for v in ("v0", "v1", "v2", "v3", "v4")}
+    ratios = {
+        round(wall[a] / wall[b])
+        for a in wall for b in wall
+        if a != b and wall[b] and wall[a] > wall[b]
+    }
+    MULT = re.compile(r"(\d{2,4})\s*(?:x|times)\s+(?:the\s+)?(?:wall clock|slower|slow)", re.I)
+    for name in (*DOCS, os.path.join("evaluation", "make_report.py")):
+        text = read(name)
+        claimed = {int(m.group(1)) for m in MULT.finditer(text)}
+        # Must round to a real pairwise ratio between committed wall clocks.
+        # The tolerance is deliberately tight (2%, floor of 1). A looser 5% band
+        # was tried first and let "94x" pass against a true 97x, which is exactly
+        # the kind of near-miss that produced this check in the first place.
+        bad = [c for c in claimed if not any(abs(c - r) <= max(1, 0.02 * r) for r in ratios)]
+        check(
+            f"{name} quotes no multiplier absent from the committed wall clocks",
+            not bad,
+            f"found {sorted(bad)}x; committed wall clocks are {wall}, giving "
+            f"ratios {sorted(ratios)}",
+        )
+
     # ------------------------------------------------- the work product is linked
     readme = read("README.md")
     check(

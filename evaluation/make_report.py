@@ -1,9 +1,16 @@
 """Generate the results tables from committed result files.
 
-No number in README.md or CHANGELOG.md is typed by hand. Everything is rendered
-from evaluation/results/*.json, so a claim in the prose cannot drift away from
-the run that produced it. Re-running the evaluation and re-running this script
-is enough to keep the whole repository honest.
+This script generates evaluation/results.md, and nothing else. Everything it
+writes is rendered from evaluation/results/*.json, so the generated tables cannot
+drift away from the runs that produced them.
+
+It does NOT render README.md. An earlier version of this docstring claimed no
+number in the README or in a CHANGELOG.md was typed by hand; the first half was
+false, the second referred to a file that does not exist in this repository, and
+a reviewer found two hand-transcription errors in the README that proved it. The
+tables in README.md are transcribed from results.md by a human and can therefore
+be wrong. What guards them is evaluation/check_docs.py, which fails if the prose
+contradicts the committed evidence.
 
 Usage:
     python3 evaluation/make_report.py            # print markdown
@@ -54,7 +61,8 @@ def corpus_conflict(results: dict) -> str | None:
 # measurement showed the model stage adds no detections while multiplying wall
 # clock. Presenting v4 here would understate the system on a metric (speed) that
 # our own evidence says to drop the model for. v4 is still reported in full in
-# the changelog below, including the fact that it cost 94x for nothing.
+# the changelog below, including the fact that it cost 97x the wall clock for
+# no additional detection.
 HEADLINE_VERSION = "v3"
 
 # --- Human time model -------------------------------------------------------

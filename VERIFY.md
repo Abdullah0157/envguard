@@ -53,11 +53,11 @@ not a degraded one. See the "known miss" section of the README.
 | 3 | The baseline finds 2 of 9 and scores 0.61, barely above the 0.50 an always-say-yes stub gets | `python3 evaluation/run_eval.py --version v0` | A balanced accuracy meaningfully above 0.61, or more than 2 defects found. |
 | 4 | envguard scores 0.94 with zero model calls, missing only `t15_safe_divide` | `python3 evaluation/run_eval.py --version v3` | Fewer than 8/9 found, any false alarm, a nonzero model call count, or a *different* task in the misses list. |
 | 5 | Adding the model *on top of* templates yields +0 detections | `python3 evaluation/run_eval.py --version v4`, compare to v3 | v4 finding a defect that v3 missed. |
-| 5b | The model is redundant, **not** incapable: it finds 8/9 unaided, just ~120x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring below 8/9, which would mean the README oversells the model rather than the templates. |
+| 5b | The model is redundant, **not** incapable: it finds 8/9 unaided, just 117x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring below 8/9, which would mean the README oversells the model rather than the templates. |
 | 6 | All 6 checkable claims the baseline made about environments it cleared are false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a count other than 6 of 6. |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
-| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 16 checks, described below. |
+| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 24 checks, described below. |
 
 ### On claim 9, which exists because this project failed it
 
@@ -80,16 +80,37 @@ python3 evaluation/check_docs.py
 
 It derives the corpus shape from `corpus/manifest.json` and every figure from
 `evaluation/results/*.json`, then fails if a document states something the
-evidence does not support. It checks that no document quotes a detection rate
-whose denominator disagrees with the corpus, that no balanced accuracy appears in
-prose that is absent from a committed result, that `envguard/llm.py` and `run.sh`
-default to the model the results were actually measured with, that
-`trajectories/05-baseline-judge.md` agrees with `evaluation/results/v0.json`, and
-that every changelog version has a result file behind it.
+evidence does not support:
 
-It was tested the way everything else here is tested: by reintroducing all three
-of the reviewer's original findings into a scratch copy and confirming it fails
-on each. It does, on five checks.
+- no document quotes a **detection rate** whose denominator disagrees with the
+  corpus, so relabelling a task updates the expectation automatically
+- no **balanced accuracy** appears in prose that is absent from a committed result
+- `envguard/llm.py` and `run.sh` default to the **model** the results were
+  actually measured with
+- `trajectories/05-baseline-judge.md` agrees with `evaluation/results/v0.json`
+- every changelog version has a **result file** behind it
+- no document asserts the **retracted provenance claim** ("no number typed by
+  hand") except where it is being withdrawn
+- every **"N times slower"** multiplier is within 2% of a real ratio between two
+  committed wall clocks
+
+The last two were added after a second review round found `126x`, `~120x` and the
+true `117x` coexisting in one README, and the retracted provenance claim still
+live in three files after being withdrawn in a fourth. Both are the same defect
+as the original: a correction applied in one place and not propagated. Both are
+now mechanical.
+
+It was tested the way everything else here is tested. Every finding from two
+rounds of external review was reintroduced into a scratch copy to confirm the
+checker fails on each: the stale detection rate, the stale balanced accuracy, the
+wrong model default, the contradicting trajectory, the retracted provenance
+claim, and two inconsistent multipliers. It catches all of them, failing 8 of its
+24 checks. Removing them returns it to PASS.
+
+The tolerance on the multiplier check is deliberately tight, at 2 percent. A
+looser 5 percent band was written first and let a claimed `94x` pass against a
+true `97x`, which is the exact near-miss the check exists to catch. That was
+found by testing the checker rather than by reading it.
 
 ---
 
@@ -175,8 +196,9 @@ environments.
 
 ### Is anything hidden in the numbers?
 
-No figure in the prose is typed by hand. Regenerate every table from the raw
-results and diff it:
+The **generated** tables cannot be, and you can prove it. `evaluation/results.md`
+and `evaluation/refutations.md` are rendered entirely from the committed JSON, so
+regenerate them and diff:
 
 ```bash
 python3 evaluation/make_report.py > /tmp/regenerated.md
@@ -189,6 +211,16 @@ diff /tmp/regenerated.md evaluation/results.md && echo "tables match the raw res
 > machine is not the machine that produced the committed numbers. That is a
 > timing artefact, not a discrepancy in any claim. Every `run_eval.py` invocation
 > accepts `--no-save` so that checking the evidence cannot alter the evidence.
+
+**The README tables are a different matter, and weaker.** They are transcribed
+from the generated files by hand, so they can be wrong, and twice they were: a
+wall clock written as 883s where `v2` records 857.2s, and a six-row table that
+had lost a row while still claiming "6 of 6". An earlier version of this document
+told you no figure in the prose was typed by hand. That was itself false and is
+retracted. The guard is `python3 evaluation/check_docs.py`, which fails when
+prose contradicts the evidence. If you find a README number that disagrees with
+`evaluation/results.md`, the generated file is right and that is a bug worth
+reporting.
 
 ---
 
