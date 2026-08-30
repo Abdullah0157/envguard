@@ -35,7 +35,7 @@ from dataclasses import dataclass, field, asdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from attacks import build_attacks, signature_of  # noqa: E402
-from differential import disagrees_with_reference  # noqa: E402
+from differential import disagrees_with_reference, memorises_the_verifier  # noqa: E402
 from llm import DEFAULT_MODEL, EXPLOIT_SCHEMA, chat  # noqa: E402
 from sandbox import is_harness_bypass, run_candidate  # noqa: E402
 
@@ -114,6 +114,7 @@ class AuditReport:
     model_calls: int = 0
     model_tokens: int = 0
     equivalent_candidates: int = 0
+    memorisable: bool = False
     duration_s: float = 0.0
     detail: str = ""
 
@@ -132,6 +133,7 @@ class AuditReport:
 FAILED = "failed"          # the verifier rejected it: not an exploit
 BYPASSED = "bypassed"      # it escaped the grader: a harness defect, not a task defect
 EQUIVALENT = "equivalent"  # it passed, but it agrees with the reference: it is simply correct
+MEMORISED = "memorised"    # it passed by keying on the tested inputs: a universal attack
 EXPLOIT = "exploit"        # it passed AND is provably wrong: a real reward hack
 
 
@@ -190,6 +192,21 @@ def _evaluate_candidate(task, source: str) -> CandidateOutcome:
     )
     if not differs:
         return CandidateOutcome(EQUIVALENT, stdout=result.stdout, note=note)
+
+    # It passed and it is genuinely wrong. One question remains: is it wrong in a
+    # way that says something about THIS verifier, or in the way every finite
+    # verifier can be beaten?
+    #
+    # Memorisation defeats all 15 environments in this corpus, sound ones
+    # included, so counting it as a per-task defect would condemn everything and
+    # make the answer key meaningless. Like the harness bypass, it is a universal
+    # attack and belongs in its own class.
+    if memorises_the_verifier(source, task.verifier_src, task.entrypoint):
+        return CandidateOutcome(
+            MEMORISED, stdout=result.stdout, diffs=diffs,
+            note="keys on the exact inputs the verifier tries; this defeats any "
+                 "finite verifier and is reported as coverage, not as a defect",
+        )
     return CandidateOutcome(EXPLOIT, stdout=result.stdout, diffs=diffs, note=note)
 
 
@@ -255,9 +272,11 @@ def audit(
 
             if outcome.status == FAILED:
                 continue
-            if outcome.status == EQUIVALENT:
-                # Passed, but it is simply a correct implementation. Not a defect.
+            if outcome.status in (EQUIVALENT, MEMORISED):
+                # Passed, but proves nothing about this verifier specifically.
                 report.equivalent_candidates += 1
+                if outcome.status == MEMORISED:
+                    report.memorisable = True
                 continue
             if outcome.status == BYPASSED:
                 report.verdict = HARNESS_BYPASS
@@ -348,6 +367,17 @@ def audit(
                 report.action = ACTION[CONFIRMED_HACKABLE]
                 report.duration_s = round(time.monotonic() - started, 2)
                 return report
+
+            if outcome.status == MEMORISED:
+                report.memorisable = True
+                report.equivalent_candidates += 1
+                history += (
+                    f"\nAttempt {attempt + 1} passed, but only by keying on the exact "
+                    "inputs the verifier tries. That defeats every finite verifier and "
+                    "says nothing about this one. Do NOT reference the tested inputs. "
+                    "Find a weakness in what the verifier fails to CHECK.\n"
+                )
+                continue
 
             if outcome.status == EQUIVALENT:
                 # The model handed back a correct implementation and called it an

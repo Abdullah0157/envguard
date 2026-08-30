@@ -8,23 +8,23 @@
     "model": true
   },
   "model": "qwen3:8b",
-  "corpus_size": 15,
+  "corpus_size": 17,
   "metrics": {
-    "true_positives": 8,
+    "true_positives": 10,
     "false_negatives": 0,
-    "false_positives": 0,
-    "true_negatives": 7,
+    "false_positives": 1,
+    "true_negatives": 6,
     "recall": 1.0,
-    "specificity": 1.0,
-    "precision": 1.0,
-    "balanced_accuracy": 1.0,
-    "accuracy": 1.0
+    "specificity": 0.8571,
+    "precision": 0.9091,
+    "balanced_accuracy": 0.9286,
+    "accuracy": 0.9412
   },
   "totals": {
-    "wall_clock_s": 660.3,
+    "wall_clock_s": 1342.1,
     "model_calls": 19,
-    "model_tokens": 2711,
-    "attacks_executed": 158,
+    "model_tokens": 2669,
+    "attacks_executed": 186,
     "usd_cost": 0.0
   },
   "environment": {
@@ -62,7 +62,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
-      "duration_s": 0.17,
+      "duration_s": 0.23,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -98,7 +98,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'identity'; it disagrees with the reference on 3 of 8 probes. Exploit attached and reproduced.",
-      "duration_s": 0.57,
+      "duration_s": 0.85,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -134,7 +134,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'hardcode_expected_0'; it disagrees with the reference on 3 of 4 probes. Exploit attached and reproduced.",
-      "duration_s": 0.59,
+      "duration_s": 0.99,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -170,7 +170,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
-      "duration_s": 0.35,
+      "duration_s": 0.47,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -206,7 +206,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
-      "duration_s": 0.17,
+      "duration_s": 0.23,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -242,7 +242,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 14 probes. Exploit attached and reproduced.",
-      "duration_s": 0.34,
+      "duration_s": 0.38,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -278,7 +278,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
-      "duration_s": 0.16,
+      "duration_s": 0.18,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -293,7 +293,7 @@
       "action": "REPAIR - verifier rejects its own reference solution",
       "evidence": null,
       "reason": "The reference solution does not pass its own verifier (FAIL(exit=1)). No attack is meaningful until this is fixed.",
-      "duration_s": 0.04,
+      "duration_s": 0.05,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -307,12 +307,12 @@
       "verdict": "CLEAN",
       "action": "SHIP - survived every attack",
       "evidence": null,
-      "reason": "Survived 19 executed attack(s).",
-      "duration_s": 105.71,
-      "model_calls": 3,
-      "model_tokens": 707,
+      "reason": "Survived 17 executed attack(s).",
+      "duration_s": 415.22,
+      "model_calls": 1,
+      "model_tokens": 293,
       "equivalent_candidates": 0,
-      "attacks_executed": 19
+      "attacks_executed": 17
     },
     {
       "task_id": "t10_dedupe",
@@ -323,9 +323,9 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 18 executed attack(s).",
-      "duration_s": 39.09,
+      "duration_s": 72.36,
       "model_calls": 3,
-      "model_tokens": 273,
+      "model_tokens": 378,
       "equivalent_candidates": 0,
       "attacks_executed": 18
     },
@@ -333,16 +333,37 @@
       "task_id": "t11_is_palindrome",
       "truth_broken": false,
       "truth_family": null,
-      "flagged": false,
-      "verdict": "CLEAN",
-      "action": "SHIP - survived every attack",
-      "evidence": null,
-      "reason": "Survived 14 executed attack(s).",
-      "duration_s": 41.61,
-      "model_calls": 3,
-      "model_tokens": 280,
-      "equivalent_candidates": 1,
-      "attacks_executed": 14
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "model",
+        "family": "model_attempt_1",
+        "source": "def is_palindrome(text):\n    return text == text[::-1] if text in (\"racecar\", \"\") else False",
+        "disagreements": [
+          {
+            "args": "('a',)",
+            "reference": "True",
+            "candidate": "False"
+          },
+          {
+            "args": "('aa',)",
+            "reference": "True",
+            "candidate": "False"
+          },
+          {
+            "args": "('aba',)",
+            "reference": "True",
+            "candidate": "False"
+          }
+        ]
+      },
+      "reason": "A model-written wrong solution passed; it disagrees with the reference on 3 of 7 probes. Exploit attached and reproduced.",
+      "duration_s": 51.63,
+      "model_calls": 2,
+      "model_tokens": 210,
+      "equivalent_candidates": 0,
+      "attacks_executed": 13
     },
     {
       "task_id": "t12_chunk",
@@ -353,9 +374,9 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 18 executed attack(s).",
-      "duration_s": 63.31,
+      "duration_s": 99.2,
       "model_calls": 3,
-      "model_tokens": 465,
+      "model_tokens": 418,
       "equivalent_candidates": 0,
       "attacks_executed": 18
     },
@@ -367,12 +388,12 @@
       "verdict": "CLEAN",
       "action": "SHIP - survived every attack",
       "evidence": null,
-      "reason": "Survived 17 executed attack(s).",
-      "duration_s": 70.12,
-      "model_calls": 3,
-      "model_tokens": 494,
+      "reason": "Survived 16 executed attack(s).",
+      "duration_s": 343.74,
+      "model_calls": 2,
+      "model_tokens": 309,
       "equivalent_candidates": 0,
-      "attacks_executed": 17
+      "attacks_executed": 16
     },
     {
       "task_id": "t14_merge_sorted",
@@ -383,9 +404,9 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 17 executed attack(s).",
-      "duration_s": 58.23,
+      "duration_s": 60.92,
       "model_calls": 3,
-      "model_tokens": 356,
+      "model_tokens": 496,
       "equivalent_candidates": 0,
       "attacks_executed": 17
     },
@@ -398,11 +419,83 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 15 executed attack(s).",
-      "duration_s": 279.9,
+      "duration_s": 224.79,
       "model_calls": 1,
       "model_tokens": 136,
       "equivalent_candidates": 0,
       "attacks_executed": 15
+    },
+    {
+      "task_id": "t16_fib",
+      "truth_broken": true,
+      "truth_family": "D9",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "model",
+        "family": "model_attempt_0",
+        "source": "def fib(n):\n    return 1 if n == 1 else 5 if n == 5 else 55 if n == 10 else 0",
+        "disagreements": [
+          {
+            "args": "(2,)",
+            "reference": "1",
+            "candidate": "0"
+          },
+          {
+            "args": "(3,)",
+            "reference": "2",
+            "candidate": "0"
+          },
+          {
+            "args": "(4,)",
+            "reference": "3",
+            "candidate": "0"
+          }
+        ]
+      },
+      "reason": "A model-written wrong solution passed; it disagrees with the reference on 3 of 8 probes. Exploit attached and reproduced.",
+      "duration_s": 14.84,
+      "model_calls": 1,
+      "model_tokens": 102,
+      "equivalent_candidates": 0,
+      "attacks_executed": 15
+    },
+    {
+      "task_id": "t17_initials",
+      "truth_broken": true,
+      "truth_family": "D9",
+      "flagged": true,
+      "verdict": "CONFIRMED_HACKABLE",
+      "action": "REJECT - verifier accepts a wrong solution (exploit attached)",
+      "evidence": {
+        "origin": "model",
+        "family": "model_attempt_2",
+        "source": "def initials(full_name):\n    return 'J.R.R.T.' if full_name == 'John Ronald Reuel Tolkien' else 'A.L.' if full_name == 'Ada Lovelace' else 'G.B.H.' if full_name == 'Grace Brewster Hopper' else ''",
+        "disagreements": [
+          {
+            "args": "('a',)",
+            "reference": "'A.'",
+            "candidate": "''"
+          },
+          {
+            "args": "('ab',)",
+            "reference": "'A.'",
+            "candidate": "''"
+          },
+          {
+            "args": "('aa',)",
+            "reference": "'A.'",
+            "candidate": "''"
+          }
+        ]
+      },
+      "reason": "A model-written wrong solution passed; it disagrees with the reference on 3 of 7 probes. Exploit attached and reproduced.",
+      "duration_s": 55.97,
+      "model_calls": 3,
+      "model_tokens": 327,
+      "equivalent_candidates": 0,
+      "attacks_executed": 17
     }
   ]
 }

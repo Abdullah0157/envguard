@@ -133,9 +133,17 @@ returns the literal the test compares against. Plausibility and correctness are
 unrelated properties, and only execution separates them.
 
 **HC2, `t11_is_palindrome` (sound, but reads as thin).** Four assertions, no
-comments. It looks under-tested. It is not: constant-true fails `"hello"`,
-constant-false fails `"racecar"`, and the expected values differ so nothing can
-be hardcoded.
+comments. It looks under-tested. Against every attack that does not memorise it,
+it holds: constant-true fails `"hello"`, constant-false fails `"racecar"`, and
+the expected values differ so nothing can be hardcoded.
+
+It is also the environment that later broke my definition of "sound" entirely.
+This is the case the attacker eventually defeated by memorising its four test
+inputs, which sent me to measure the other six and find they all fall the same
+way. That story is under
+[The finding that changed the project](#the-finding-that-changed-the-project-no-verifier-is-unhackable).
+HC2 therefore did its job twice: once as a false-positive trap, and once as the
+case that exposed a wrong assumption in the corpus itself.
 
 **What HC2 revealed was the most important finding in the build.** The attacker
 model produced this and declared it an exploit:
@@ -309,17 +317,76 @@ on those outputs. Until that separation exists, any in-process harness, includin
 every pytest-based RL environment in wide use today, is forgeable by code that
 flushes a success marker and exits.
 
-Second, smaller limitation: `CLEAN` means "resisted every attack we ran." No
-finite set of assertions can be proven unhackable, because a solution that
-memorises the test cases passes any finite test suite. `CLEAN` is evidence, not
-proof, and the report says so.
+**Second: memorisation defeats every finite verifier, including all seven sound
+ones in this corpus.** This is not a limitation discovered by reasoning about it;
+it was measured, after the attacker model produced a memorising solution against
+an environment labelled sound. See "The finding that changed the project" above.
+
+envguard detects memorisation and reports it as a coverage property rather than a
+defect, because an attack that beats everything distinguishes nothing. But
+detection is not a fix. The fix is coverage, and coverage has no ceiling: a
+verifier is only ever *harder* to memorise, never impossible. `CLEAN` therefore
+means "no attack succeeded that did not key on the verifier's own test inputs",
+which is the strongest claim a finite test suite can support.
+
+---
+
+## The finding that changed the project: no verifier is unhackable
+
+Late in the build, the attacker model returned this against `t11_is_palindrome`,
+an environment I had labelled **sound**:
+
+```python
+def is_palindrome(text):
+    return text == text[::-1] if text in ("racecar", "") else False
+```
+
+It returns `False` for every input except the two the verifier happens to check.
+`is_palindrome("aa")` returns `False`, and "aa" is a palindrome. That is genuinely
+broken code, and it passes.
+
+So I measured how far it went, rather than patching the one case:
+
+> **All 7 sound environments fall to it. Every single one.**
+
+The reason is not a flaw in those seven verifiers. It is arithmetic. **A finite
+list of assertions can always be satisfied by memorising the list.** "Unhackable"
+is not a property a finite verifier can have.
+
+This is the same shape as the harness bypass caught on day one: a **universal
+attack** that defeats everything, and therefore says nothing about any particular
+environment. Left unclassified it would have marked the entire corpus broken and
+destroyed the answer key, for the second time.
+
+**How it is handled.** `envguard/differential.py` separates memorisation from a
+real exploit by asking what the candidate *branches on*. `return 42` never
+mentions the tested inputs. `if n == 3` does. Memorisation is reported as a
+**coverage** property of the verifier, never as a defect, so it can never
+contaminate a per-task verdict.
+
+Getting that discriminator right took two attempts. The first version flagged six
+legitimate template exploits, because a hardcoded *output* can coincide with an
+*input*: `clamp(5, 0, 10) == 5` returns the same 5 it was given. Only literals in
+a deciding position, inside a comparison or as a dict key, actually indicate
+memorisation.
+
+**What "sound" therefore means here**, stated precisely rather than implied: *no
+attack succeeds that does not key on the verifier's own test inputs.* That is the
+strongest claim any finite test suite can support, and it is weaker than the word
+"clean" suggests. The manifest says so in those words.
+
+**Two environments were deleted because of this.** They had been added
+specifically as cases only the model could crack. Once memorisation was correctly
+classified, their only exploit was memorisation, which meant they differed from
+the sound environments in degree rather than in kind. They were measuring test
+suite size, not verifier quality, so they were removed.
 
 ---
 
 ## Hot take
 
-**Execution was load-bearing. Intelligence was optional, and it was the expensive
-way to buy the same answer.**
+**Execution was load-bearing. Intelligence was optional for the work I planned,
+and indispensable for the mistake I did not.**
 
 The tempting version of this finding is "the model was useless." That is not what
 the measurement says, and I nearly wrote it before running the experiment that
@@ -352,6 +419,23 @@ for-loop enumerates them faster than any model can reason its way to them.
 The useful question for a data lab is therefore not *can the model do it*. It
 demonstrably can. The question is *is the model the cheapest thing that can*, and
 here it was not, by two orders of magnitude.
+
+**And then the model did the one thing the templates never could.** It found an
+error in my ground truth. Not a planted puzzle, an actual mistake: seven
+environments I had certified as sound were defeated by an attack I had not
+considered. No template found that, because no template was written to look for
+it, and I could not have written one for a weakness I did not know existed.
+
+That is the honest division of labour this project actually measured:
+
+| | What it is for |
+|---|---|
+| **Deterministic attacks** | Finding the defects you already know how to describe. Faster and cheaper than inference, every time. |
+| **The model** | Finding the ones you didn't. It is not a cheaper enumerator; it is the thing that questions your assumptions. |
+
+The mistake would be reading the wall-clock numbers and concluding "drop the
+model." On the work I designed, it was 126 times slower for an identical answer.
+On the work I got wrong, it was the only component that caught me.
 
 One caveat I will not paper over: this corpus is small, synthetic, and its defect
 families are exactly the enumerable kind. On defects that are not enumerable, the
