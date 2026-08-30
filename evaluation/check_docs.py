@@ -520,8 +520,7 @@ def main() -> int:
     # ---------------------------------------- claims living outside the prose
     # manifest.json: a note may not assert that a configuration reaches an
     # environment that every committed result reports as missed.
-    with open(os.path.join(ROOT, "corpus", "manifest.json"), encoding="utf-8") as fh:
-        manifest_raw = json.load(fh)
+    manifest_raw = manifest
     all_results = load_all()
     overclaimed = []
     for task in manifest_raw["tasks"]:
@@ -560,6 +559,38 @@ def main() -> int:
             f"result. The artifact a judge opens must not lead with a comparison "
             f"the README retracts. Rebuild with: ./run.sh report",
         )
+
+    # ---------------------------------- the manifest's own prose and family keys
+    # The answer key contradicted itself: manifest.json's description said
+    # "9 carry a verifier defect; 6 are sound" while its per-task flags said 10
+    # and 5, and defect_families defined D1..D9 while t13 was assigned D10.
+    # This checker read the flags and never the prose in the same file, which is
+    # the same blind spot as reading digits and not words: the guard covered the
+    # machine-readable half of a file and certified the half a human reads.
+    desc = manifest.get("description", "")
+    desc_nums = re.findall(r"(\d+)\s+(?:carry|are|is)\b", desc)
+    desc_problems = []
+    if desc_nums:
+        claimed = [int(n) for n in desc_nums[:2]]
+        if claimed and claimed[0] != broken:
+            desc_problems.append(f"description says {claimed[0]} broken, flags say {broken}")
+        if len(claimed) > 1 and claimed[1] != sound:
+            desc_problems.append(f"description says {claimed[1]} sound, flags say {sound}")
+    check(
+        "corpus/manifest.json description agrees with its own task flags",
+        not desc_problems,
+        "; ".join(desc_problems) + ". The answer key must not contradict itself.",
+    )
+
+    declared = set(manifest.get("defect_families", {}))
+    used = {t["defect_family"] for t in manifest["tasks"] if t.get("defect_family")}
+    undefined = sorted(used - declared)
+    check(
+        "every defect family a task uses is defined in the manifest",
+        not undefined,
+        f"{undefined} assigned to tasks but absent from defect_families. A family "
+        f"key with no definition is a dangling reference in the answer key.",
+    )
 
     # ------------------------------------- README's refutation table vs the generator
     # refutations.md is generated and always correct; the README copy is

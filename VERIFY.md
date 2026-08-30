@@ -12,8 +12,13 @@ You are not asked to trust the README. You are asked to try to break it.
 If you only run one thing:
 
 ```bash
-python3 evaluation/run_eval.py --version v3
+python3 evaluation/run_eval.py --version v3 --no-save
 ```
+
+`--no-save` matters. Without it this command **rewrites**
+`evaluation/results/v3.json` with your machine's wall clock, and the next thing
+you check will differ from the committed copy because you checked it. A reviewer
+pointed out that the guard existed and the documented path bypassed it.
 
 Expected last lines:
 
@@ -60,10 +65,10 @@ cannot find" in the README.
 | 4 | envguard scores 0.90 with zero model calls, missing exactly `t13_normalize_whitespace` and `t15_safe_divide` | `python3 evaluation/run_eval.py --version v3` | Fewer than 8/10 found, any false alarm, a nonzero model call count, or a *different* task in the misses list. |
 | 5 | Adding the model *on top of* templates yields +0 detections | `python3 evaluation/run_eval.py --version v4`, compare to v3 | v4 finding a defect that v3 missed. |
 | 5b | The model is **not** incapable: unaided it finds 7 of 10, one fewer than the templates and ~120x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring at or above 8/10, which would mean the README undersells the model. |
-| 6 | All 6 checkable claims the baseline made about environments it cleared are false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a count other than 6 of 6. |
+| 6 | Every checkable claim the baseline made about environments it cleared is false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a total that is not N of N. The count grows with the corpus: it was 6 of 6 and is now **7 of 7**, because relabelling `t13_normalize_whitespace` added a row. A fixed number here is itself a defect, and this row previously carried one. |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
-| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 34 checks, described below. |
+| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 36 checks, described below. |
 
 ### On claim 9, which exists because this project failed it
 

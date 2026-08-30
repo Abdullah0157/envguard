@@ -260,14 +260,28 @@ def build(results: dict) -> str:
         parts.append("</table>")
 
         best = max(readonly, key=lambda kv: kv[1]["metrics"]["balanced_accuracy"])
+        _top = best[1]["metrics"]["balanced_accuracy"]
+        _tied = [
+            (v, pl) for v, pl in readonly
+            if abs(pl["metrics"]["balanced_accuracy"] - _top) < 1e-9
+        ]
         parts.append(
             "<p class='caption'><strong>Read this table sceptically, which is how it "
             "is meant to be read.</strong> An external reviewer showed that most of "
             "the original headline gap was a property of the <code>v0</code> prompt "
-            "rather than of execution, and reached 0.83 with their own read-only "
-            f"prompt. The strongest configuration here is <code>{esc(best[0])}</code> "
-            f"at {best[1]['metrics']['balanced_accuracy']:.2f}. The defensible gap is "
-            "roughly 0.83 to 0.94, not the 0.61 to 0.94 this project first reported. "
+            "rather than of execution. On the corrected answer key their prompt "
+            "scores 0.80. "
+            + (
+                "The best read-only score committed here is "
+                f"{best[1]['metrics']['balanced_accuracy']:.2f}, reached by "
+                + " and ".join(f"<code>{esc(v)}</code>" for v, _ in _tied)
+                + (". They tie: the stronger prompt finds more defects and pays "
+                   "for them with false alarms, and the two effects cancel. "
+                   if len(_tied) > 1 else ". ")
+            )
+            + "The defensible gap is roughly 0.80 to "
+            f"{m['balanced_accuracy']:.2f}, not the 0.61 to 0.94 this project first "
+            "reported. "
             "<code>v0-reason-first</code> is <code>v0</code> with two output-schema "
             "keys swapped and nothing else changed, which is included because a "
             "verdict that moves that far on a detail carrying no meaning is the "

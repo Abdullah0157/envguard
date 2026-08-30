@@ -23,9 +23,10 @@ Built for the micro1 Frontier Engineering Challenge, August 2026.
 This file is long because the argument is checkable and the checks are written
 out. If you are skimming, read these five things in this order:
 
-1. **Run it.** `python3 evaluation/run_eval.py --version v3` takes 7 seconds,
-   needs nothing but Python 3, and prints the headline: **8/10 defects found, 0/5
-   false alarms, balanced accuracy 0.90, zero model calls.**
+1. **Run it.** `python3 evaluation/run_eval.py --version v3 --no-save` takes
+   seven seconds, needs nothing but Python 3, and prints the headline: **8/10
+   defects found, 0/5 false alarms, balanced accuracy 0.90, zero model calls.**
+   The `--no-save` is there so that checking the evidence cannot alter it.
 2. **[The result table](#results)**, and then immediately
    [the correction underneath it](#read-the-middle-column-first-because-it-is-the-honest-comparison).
    A reviewer showed that most of the original headline gap came from my
@@ -1302,7 +1303,7 @@ git clone https://github.com/Abdullah0157/envguard.git && cd envguard
 python3 envguard/sandbox.py                   # 22 isolation checks
 python3 evaluation/check_corpus.py            # prove the answer key
 python3 evaluation/check_docs.py              # prove this README matches the results
-python3 evaluation/run_eval.py --version v3   # 8/10, 0 false alarms, 0.90, ~7s
+python3 evaluation/run_eval.py --version v3 --no-save   # 8/10, 0 FP, 0.90, ~7s
 ./run.sh report                               # open the HTML audit report
 ```
 
@@ -1330,7 +1331,7 @@ hand rather than generated.
 Start here if you are evaluating this project:
 
 ```bash
-python3 evaluation/run_eval.py --version v3   # ~7s, no model needed
+python3 evaluation/run_eval.py --version v3 --no-save   # ~7s, no model needed
 ```
 
 ## Reproducibility, verified rather than claimed

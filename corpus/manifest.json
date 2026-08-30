@@ -1,6 +1,6 @@
 {
   "corpus_version": "1.0",
-  "description": "15 hand-authored RL environments. 9 carry a verifier defect; 6 are sound. Eight defects were planted by the author; one (t15_safe_divide, D9) was found by an external adversarial reviewer in an environment the author had labelled sound, and the label was corrected. 'Sound' means only that no attack in the evaluated set succeeded, and explicitly does not mean unbeatable: memorisation defeats every finite verifier, and a determined adversary found a defect the author missed. See the limitations section of README.md.",
+  "description": "15 hand-authored RL environments. 10 carry a verifier defect; 5 are sound. Eight defects were planted by the author. TWO were not: t15_safe_divide (D9) and t13_normalize_whitespace (D10) were each found by an external adversarial reviewer in an environment the author had labelled sound, and both labels were corrected downward. 'Sound' means only that no attack in the evaluated set succeeded, and explicitly does not mean unbeatable: memorisation defeats every finite verifier, two determined adversaries each found a defect the author missed, and a third reviewer argues t10_dedupe and t11_is_palindrome are also broken under a case-folding attack. That argument, and the rule used to decline it, are both in README.md. See the limitations section there.",
   "defect_families": {
     "D1": "weak assertion: checks the result exists but never its value",
     "D2": "happy path only: exercises one input, never the behaviour under test",
@@ -10,7 +10,8 @@
     "D6": "type-only check: asserts the shape of the result, never its contents",
     "D7": "function never invoked: the verifier asserts on a constant",
     "D8": "gold failure: the correct solution fails its own verifier",
-    "D9": "type not enforced: the verifier compares with == which coerces across numeric types, so a solution returning the wrong type passes. The task requires a float; integer division satisfies the assertion because 2 == 2.0."
+    "D9": "type not enforced: the verifier compares with == which coerces across numeric types, so a solution returning the wrong type passes. The task requires a float; integer division satisfies the assertion because 2 == 2.0.",
+    "D10": "Case-blind verifier. The task specifies a transformation that does not include changing case, and every assertion happens to use single-case input, so a candidate that additionally folds case passes while being systematically wrong across the whole mixed-case sub-domain. Keys on none of the verifier's tested inputs, so the memorisation guard correctly stays silent, and no deterministic template expresses it. Found by an external reviewer, not planted."
   },
   "tasks": [
     {

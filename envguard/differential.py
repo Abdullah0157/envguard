@@ -522,11 +522,25 @@ def disagrees_with_reference(
     if diffs:
         note = f"disagrees with the reference on {len(diffs)} of {compared} probes"
         if oracle_never_ran:
+            # Report the SYMPTOM, and name the cause only when it is actually
+            # present. An earlier version asserted "this verifier never calls its
+            # own entrypoint" whenever every shown diff had the reference raising.
+            # A reviewer found a verifier that calls its entrypoint three times and
+            # still triggered that sentence: the code was inferring a cause (a D7
+            # verifier) from a symptom (probes outside the domain), and stating the
+            # inference as fact inside the one artifact whose entire value is that
+            # a human can trust its text.
             note += (
-                " (the reference raises on every probe shown: this verifier never "
-                "calls its own entrypoint, so the input domain could not be "
-                "inferred and the disagreement is weaker evidence than usual)"
+                " (the reference raises on every probe shown, so the probes are "
+                "outside its input domain and this disagreement is weaker evidence "
+                "than usual"
             )
+            if not _call_arguments(verifier_src, name):
+                note += (
+                    "; the verifier never calls its own entrypoint, so the domain "
+                    "could not be inferred from it"
+                )
+            note += ")"
         return True, diffs, note, True
     return False, [], f"agrees with the reference on all {compared} probes", True
 
