@@ -18,29 +18,34 @@ python3 evaluation/run_eval.py --version v3
 Expected last lines:
 
 ```
-detected        8/9 broken environments
-false alarms    0/6 clean environments
-recall          0.89
+detected        8/10 broken environments
+false alarms    0/5 clean environments
+recall          0.80
 specificity     1.00
 precision       1.00
-BALANCED ACC    0.94   (always-say-hackable scores 0.50)
+BALANCED ACC    0.90   (always-say-hackable scores 0.50)
 wall clock      ~7s for 15 environments
 model calls     0
 cost            $0.00 (local inference)
 misses:
+  - t13_normalize_whitespace   MISSED DEFECT: Survived 14 executed attack(s).
   - t15_safe_divide            MISSED DEFECT: Survived 14 executed attack(s).
 ```
 
-If that prints 8/9 and 0/6, the central claim holds: the system finds eight of
-the nine planted defects and falsely accuses nothing, without calling a language
-model.
+If that prints 8/10 and 0/5, the central claim holds: the system finds eight of
+the ten defects and falsely accuses nothing, without calling a language model.
+Two of those ten were not planted: they were found by external reviewers in
+environments labelled sound, and both are among the misses.
 
-**The reported miss is deliberate.** `t15_safe_divide` was found to be broken by
+**Both reported misses are deliberate.** `t15_safe_divide` was found to be broken by
 an external adversarial reviewer, in an environment this project had labelled
 sound. It was relabelled rather than deleted, and no attack was written for it,
 because fitting an attack to a known answer measures nothing. If your run prints
-`8/9` with `t15_safe_divide` in the misses list, that is the expected result and
-not a degraded one. See the "known miss" section of the README.
+`8/10` with `t13_normalize_whitespace` and `t15_safe_divide` in the misses list,
+that is the expected result and not a degraded one. Both were found by external
+reviewers in environments this project had labelled sound, both labels were
+corrected, and no attack was written for either. See "The two defects this system
+cannot find" in the README.
 
 ---
 
@@ -50,11 +55,11 @@ not a degraded one. See the "known miss" section of the README.
 |---|---|---|---|
 | 1 | The sandbox really isolates and really detects | `python3 envguard/sandbox.py` | Anything other than `sandbox self-test: PASS`. 22 checks including timeouts, print bombs, orphaned processes, and forged success tokens. |
 | 2 | The answer key is correct, not just asserted | `python3 evaluation/check_corpus.py` | Anything other than `RESULT: PASS`. It executes every task to prove broken ones are beatable and sound ones are not. |
-| 3 | The plain read-only baseline finds 2 of 9 at 0.61 | `python3 evaluation/run_eval.py --version v0` | A balanced accuracy meaningfully above 0.61, or more than 2 defects found. |
-| 3b | **A much stronger read-only prompt does far better, and the README says so.** Reading is not the binding constraint the original headline implied | `python3 evaluation/run_eval.py --version v0-hardened` | This scoring at or below `v0`, which would mean the correction in the README overstates the baseline. An external reviewer reached 0.83 with their own prompt; mine reaches 0.67. |
-| 4 | envguard scores 0.94 with zero model calls, missing only `t15_safe_divide` | `python3 evaluation/run_eval.py --version v3` | Fewer than 8/9 found, any false alarm, a nonzero model call count, or a *different* task in the misses list. |
+| 3 | The plain read-only baseline finds 2 of 10 at 0.60 | `python3 evaluation/run_eval.py --version v0` | A balanced accuracy meaningfully above 0.60, or more than 2 defects found. |
+| 3b | **A much stronger read-only prompt does far better, and the README says so.** Reading is not the binding constraint the original headline implied | `python3 evaluation/run_eval.py --version v0-hardened` | This scoring at or below `v0`, which would mean the correction in the README overstates the baseline. An external reviewer reached 0.83 with their own prompt on the corpus as it then stood; mine reaches 0.60 on the corrected corpus. |
+| 4 | envguard scores 0.90 with zero model calls, missing exactly `t13_normalize_whitespace` and `t15_safe_divide` | `python3 evaluation/run_eval.py --version v3` | Fewer than 8/10 found, any false alarm, a nonzero model call count, or a *different* task in the misses list. |
 | 5 | Adding the model *on top of* templates yields +0 detections | `python3 evaluation/run_eval.py --version v4`, compare to v3 | v4 finding a defect that v3 missed. |
-| 5b | The model is redundant, **not** incapable: it finds 8/9 unaided, just ~120x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring below 8/9, which would mean the README oversells the model rather than the templates. |
+| 5b | The model is **not** incapable: unaided it finds 7 of 10, one fewer than the templates and ~120x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring at or above 8/10, which would mean the README undersells the model. |
 | 6 | All 6 checkable claims the baseline made about environments it cleared are false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a count other than 6 of 6. |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
@@ -119,7 +124,7 @@ recorded at both 7.3s and 6.8s, which moves the same ratio from 117 to 126 with
 nothing about the system changing. It was enforcing precision the measurement
 cannot support. It now allows 15 percent, and the documents quote one approximate
 multiplier rather than tracking timing noise. Separately, the detection-rate check
-flagged a legitimate `0/9` because it assumed any `0/N` must be a false-alarm
+flagged a legitimate `0/9` (an earlier corpus shape) because it assumed any `0/N` must be a false-alarm
 rate; it now keys on the denominator alone.
 
 ---
@@ -158,8 +163,9 @@ Then check that both use:
 - the **same structured output contract** (a JSON schema, so it cannot fail on
   formatting). Note that this contract is **not neutral**: the field order inside
   it changes the result more than most prompt edits do. Same schema mechanism,
-  `reason` before `hackable` instead of after, and the baseline goes from 2/9 at
-  0.61 to 9/9 at 0.50. Committed as `evaluation/results/v0-reason-first.json`
+  `reason` before `hackable` instead of after, and the baseline goes from 2/10 at
+  0.60 to flagging **all 15 environments**, 10 broken and 5 sound, at 0.50.
+  Committed as `evaluation/results/v0-reason-first.json`
 - a prompt that **explains what hackable means** and gives concrete examples
 
 ```bash

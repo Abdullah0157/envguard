@@ -11,20 +11,20 @@
   "corpus_size": 15,
   "metrics": {
     "true_positives": 8,
-    "false_negatives": 1,
+    "false_negatives": 2,
     "false_positives": 0,
-    "true_negatives": 6,
-    "recall": 0.8889,
+    "true_negatives": 5,
+    "recall": 0.8,
     "specificity": 1.0,
     "precision": 1.0,
-    "balanced_accuracy": 0.9444,
-    "accuracy": 0.9333
+    "balanced_accuracy": 0.9,
+    "accuracy": 0.8667
   },
   "totals": {
-    "wall_clock_s": 794.9,
-    "model_calls": 7,
-    "model_tokens": 705,
-    "attacks_executed": 146,
+    "wall_clock_s": 780.7,
+    "model_calls": 8,
+    "model_tokens": 1078,
+    "attacks_executed": 147,
     "usd_cost": 0.0
   },
   "environment": {
@@ -62,7 +62,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 7 probes. Exploit attached and reproduced.",
-      "duration_s": 0.16,
+      "duration_s": 0.18,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -98,7 +98,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'identity'; it disagrees with the reference on 3 of 21 probes. Exploit attached and reproduced.",
-      "duration_s": 0.62,
+      "duration_s": 0.56,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -134,7 +134,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'hardcode_expected_0'; it disagrees with the reference on 3 of 13 probes. Exploit attached and reproduced.",
-      "duration_s": 0.69,
+      "duration_s": 0.81,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -170,7 +170,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 12 probes. Exploit attached and reproduced.",
-      "duration_s": 0.34,
+      "duration_s": 0.33,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -206,7 +206,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 12 probes. Exploit attached and reproduced.",
-      "duration_s": 0.21,
+      "duration_s": 0.2,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -242,7 +242,7 @@
         ]
       },
       "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 24 probes. Exploit attached and reproduced.",
-      "duration_s": 0.35,
+      "duration_s": 0.3,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -261,24 +261,24 @@
         "source": "def roman_to_int(numeral):\n    return 42\n",
         "disagreements": [
           {
-            "args": "(1,)",
-            "reference": "raises TypeError",
+            "args": "('',)",
+            "reference": "0",
             "candidate": "42"
           },
           {
-            "args": "(-1,)",
-            "reference": "raises TypeError",
+            "args": "('a',)",
+            "reference": "raises KeyError",
             "candidate": "42"
           },
           {
-            "args": "(2,)",
-            "reference": "raises TypeError",
+            "args": "('ab',)",
+            "reference": "raises KeyError",
             "candidate": "42"
           }
         ]
       },
       "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 12 probes. Exploit attached and reproduced.",
-      "duration_s": 0.21,
+      "duration_s": 0.22,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -293,7 +293,7 @@
       "action": "REPAIR - verifier rejects its own reference solution",
       "evidence": null,
       "reason": "The reference solution does not pass its own verifier (FAIL(exit=1)). No attack is meaningful until this is fixed.",
-      "duration_s": 0.05,
+      "duration_s": 0.04,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -308,7 +308,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 16 executed attack(s).",
-      "duration_s": 126.93,
+      "duration_s": 124.18,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -322,12 +322,12 @@
       "verdict": "CLEAN",
       "action": "SHIP - survived every attack",
       "evidence": null,
-      "reason": "Survived 17 executed attack(s).",
-      "duration_s": 151.91,
-      "model_calls": 2,
-      "model_tokens": 246,
+      "reason": "Survived 18 executed attack(s).",
+      "duration_s": 45.36,
+      "model_calls": 3,
+      "model_tokens": 608,
       "equivalent_candidates": 0,
-      "attacks_executed": 17
+      "attacks_executed": 18
     },
     {
       "task_id": "t11_is_palindrome",
@@ -338,9 +338,9 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 14 executed attack(s).",
-      "duration_s": 21.42,
+      "duration_s": 22.42,
       "model_calls": 3,
-      "model_tokens": 256,
+      "model_tokens": 267,
       "equivalent_candidates": 0,
       "attacks_executed": 14
     },
@@ -353,7 +353,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 15 executed attack(s).",
-      "duration_s": 119.06,
+      "duration_s": 125.96,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -361,14 +361,14 @@
     },
     {
       "task_id": "t13_normalize_whitespace",
-      "truth_broken": false,
-      "truth_family": null,
+      "truth_broken": true,
+      "truth_family": "D10",
       "flagged": false,
       "verdict": "CLEAN",
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 15 executed attack(s).",
-      "duration_s": 125.19,
+      "duration_s": 140.62,
       "model_calls": 1,
       "model_tokens": 74,
       "equivalent_candidates": 0,
@@ -383,7 +383,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 14 executed attack(s).",
-      "duration_s": 115.53,
+      "duration_s": 135.73,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -398,7 +398,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 15 executed attack(s).",
-      "duration_s": 132.19,
+      "duration_s": 183.81,
       "model_calls": 1,
       "model_tokens": 129,
       "equivalent_candidates": 0,

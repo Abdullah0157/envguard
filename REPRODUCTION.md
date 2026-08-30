@@ -82,7 +82,7 @@ results.
 > where all of the detection came from, never load a model at all:
 >
 > ```bash
-> python3 evaluation/run_eval.py --version v3   # 8/9, 0.94, ~7s, no inference
+> python3 evaluation/run_eval.py --version v3   # 8/10, 0.90, ~7s, no inference
 > ```
 
 ## 3. Get the code
@@ -139,7 +139,7 @@ every deterministic attack, and that no attack is a universal harness bypass. Th
 detection rates reported later are only meaningful because this passes.
 
 `check_docs.py` exists because this repository failed the check it performs. An
-external reviewer ran the sixty-second check in `VERIFY.md`, got 8/9 where the
+external reviewer ran the sixty-second check in `VERIFY.md`, got 8/9 at the time where the
 document said to expect 8/8, and was right: a late corpus relabel had moved the
 answer key without the prose following. That script now derives every figure from
 `corpus/manifest.json` and `evaluation/results/*.json` and refuses to pass if any
@@ -217,7 +217,7 @@ distribution.
 ## 9. What you should see
 
 - `v0`, the read-only baseline, finds **2 of 9** defects for a balanced accuracy
-  of 0.61. It describes each weakness accurately and concludes the environment is
+  of 0.60. It describes each weakness accurately and concludes the environment is
   fine anyway.
 - `v3` finds **8 of 9** with **0 false alarms** in about seven seconds and zero
   model calls.
@@ -254,21 +254,22 @@ order, with no edits and no steps skipped.
 | 4a | `python3 envguard/sandbox.py` | `sandbox self-test: PASS` (22 checks) |
 | 4b | `python3 evaluation/check_corpus.py` | `RESULT: PASS - answer key is sound` |
 | 4c | `python3 envguard/llm.py` | `llm self-test: PASS`, model-written exploit executed and confirmed |
-| 5 | `python3 evaluation/run_eval.py --version v3` | 8/9 found, 0/6 false alarms, balanced accuracy 0.94, 6.7s, 0 model calls |
+| 5 | `python3 evaluation/run_eval.py --version v3` | 8/10 found, 0/5 false alarms, balanced accuracy 0.90, ~7s, 0 model calls |
 
 Step 5 printed, verbatim:
 
 ```
-  detected        8/9 broken environments
-  false alarms    0/6 clean environments
-  recall          0.89
+  detected        8/10 broken environments
+  false alarms    0/5 clean environments
+  recall          0.80
   specificity     1.00
   precision       1.00
-  BALANCED ACC    0.94   (always-say-hackable scores 0.50)
+  BALANCED ACC    0.90   (always-say-hackable scores 0.50)
   wall clock      6.7s for 15 environments
   model calls     0
   cost            $0.00 (local inference)
   misses:
+    - t13_normalize_whitespace   MISSED DEFECT: Survived 14 executed attack(s).
     - t15_safe_divide            MISSED DEFECT: Survived 14 executed attack(s).
 ```
 
@@ -279,20 +280,20 @@ identical between the fresh clone and the committed `evaluation/results/v3.json`
 ```
 [ok] true_positives       8        (committed 8)
 [ok] false_positives      0        (committed 0)
-[ok] true_negatives       6        (committed 6)
-[ok] false_negatives      1        (committed 1)
-[ok] recall               0.8889   (committed 0.8889)
+[ok] true_negatives       5        (committed 5)
+[ok] false_negatives      2        (committed 2)
+[ok] recall               0.8      (committed 0.8)
 [ok] specificity          1.0      (committed 1.0)
 [ok] precision            1.0      (committed 1.0)
-[ok] balanced_accuracy    0.9444   (committed 0.9444)
+[ok] balanced_accuracy    0.9      (committed 0.9)
 [ok] 15/15 per-task verdicts identical
      differing: none
 ```
 
-The single false negative is `t15_safe_divide`. It is a **known and reported
-miss**, not a reproduction failure: the published result is 8/9 and a machine
-that had never seen this repository also gets 8/9. A run that printed 9/9 would
-be the surprising outcome.
+The two false negatives are `t13_normalize_whitespace` and `t15_safe_divide`.
+Both are **known and reported misses**, not reproduction failures: the published
+result is 8/10 and a machine that had never seen this repository also gets 8/10.
+A run that printed 10/10 would be the surprising outcome.
 
 The deterministic path carries no dependency on wall-clock time, randomness, or
 network access, which is why every verdict and every derived rate reproduces

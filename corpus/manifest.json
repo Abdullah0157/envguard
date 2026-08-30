@@ -105,9 +105,12 @@
     },
     {
       "id": "t13_normalize_whitespace",
-      "broken": false,
-      "defect_family": null,
-      "notes": "Empty string, single token, tabs and newlines, already-normalised input."
+      "broken": true,
+      "defect_family": "D10",
+      "notes": "Found by an external adversarial reviewer, not by the author, and it is the SECOND environment this project labelled sound that turned out to be broken. The task says to collapse runs of whitespace and strip the ends. It says nothing about case, and every one of the five assertions uses lowercase-only input, so the verifier never discriminates on case. ' '.join(text.lower().split()) passes all five while silently lowercasing every input: normalize_whitespace('Hello World') returns 'hello world', not 'Hello World'. Same shape as t15_safe_divide: systematic wrongness across a whole sub-domain that the verifier's inputs happen never to touch. No deterministic template expresses .lower(), and the model did not generate it either, so no committed configuration detects this environment. It is relabelled and reported as a miss rather than removed, and no attack was written for it, because fitting an attack to a known answer measures nothing.",
+      "reference_exploit": "def normalize_whitespace(text):\n    return \" \".join(text.lower().split())\n",
+      "template_beatable": false,
+      "hard_case": "HC4"
     },
     {
       "id": "t14_merge_sorted",

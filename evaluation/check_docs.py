@@ -137,10 +137,38 @@ def main() -> int:
         text = read(name)
         hits = sorted({w for w in watch if re.search(rf"(?<![\d/]){re.escape(w)}(?![\d/])", text)})
         # A doc may legitimately quote a historical figure, but only if it says so.
+        # A document may quote a superseded rate while narrating the correction
+        # that superseded it, but it has to say so. Two forms are accepted: the
+        # marker on the same line, or a table whose heading paragraph declares the
+        # whole block historical. The second exists because the corpus was
+        # relabelled twice, and the measurements taken before each relabel are
+        # still worth showing side by side; they simply cannot be renumbered,
+        # because nobody re-ran those prompts against the corrected key.
+        HIST = r"(earlier|stale|was false|relabel|at the time|historical|previous corpus|then stood|older corpus)"
+        historical_blocks = []
+        block: list[str] = []
+        marked = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("|"):
+                if marked:
+                    block.append(line)
+            else:
+                if block:
+                    historical_blocks.append("\n".join(block)); block = []
+                # Blank lines do not clear the marker: a caption is normally
+                # separated from its table by one.
+                if stripped:
+                    marked = bool(re.search(HIST, line, re.I))
+        if block:
+            historical_blocks.append("\n".join(block))
+        historical_text = "\n".join(historical_blocks)
+
         hits = [
             h for h in hits
-            if not re.search(rf"{re.escape(h)}[^\n]*(earlier|stale|was false|relabel|at the time|historical)", text)
-            and not re.search(rf"(earlier|stale|was false|relabel|at the time|historical)[^\n]*{re.escape(h)}", text)
+            if not re.search(rf"{re.escape(h)}[^\n]*{HIST}", text, re.I)
+            and not re.search(rf"{HIST}[^\n]*{re.escape(h)}", text, re.I)
+            and h not in historical_text
         ]
         check(
             f"{name} states no stale detection rate",

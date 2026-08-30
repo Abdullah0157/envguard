@@ -23,10 +23,11 @@ The baseline read each verifier and concluded it was sound. For each one below, 
 | `t03_slugify` | "The verifier only checks one specific input and output. It does not validate ..." | `return "hello-world-again"` | **passes** (the verifier is broken) |
 | `t05_parse_int` | "The verifier checks two specific cases: '12' should return 12 and 'abc' shoul..." | `raise ValueError("nope")` | **passes** (the verifier is broken) |
 | `t06_top_k` | "The verifier only checks if the result is a list, which is a very weak constr..." | `return []` | **passes** (the verifier is broken) |
+| `t13_normalize_whitespace` | "The verifier checks multiple specific cases including empty string, single ch..." | `return " ".join(text.lower().split())` | **passes** (the verifier is broken) |
 | `t15_safe_divide` | "The verifier checks multiple specific cases including zero denominator and po..." | `return numerator // denominator` | **passes** (the verifier is broken) |
 
 
-**6 of 6** checkable claims the baseline made are false, and each is refuted by executing a program against the very verifier the baseline judged.
+**7 of 7** checkable claims the baseline made are false, and each is refuted by executing a program against the very verifier the baseline judged.
 
 
 The baseline is not vague. It is specific, confident, and wrong, which is the hardest kind of wrong to catch by reading.
