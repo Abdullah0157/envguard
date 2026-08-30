@@ -38,6 +38,13 @@ RESULTS_DIR = os.path.join(ROOT, "evaluation", "results")
 # Stage configuration per changelog version.
 CONFIGS = {
     "v0": {"mode": "baseline", "label": "baseline: read the verifier, execute nothing"},
+    # The upper bound on reading alone. Same model, same corpus, same schema, same
+    # seeds, still no execution: only the prompt changes, to one that enumerates
+    # the corpus's own defect taxonomy and tells the model to assume guilt. Added
+    # after an external reviewer showed that most of the v0-to-v3 gap came from
+    # the weak prompt rather than from execution. This is the honest comparison.
+    "v0-hardened": {"mode": "baseline", "hardened": True,
+                    "label": "hardened baseline: same reading, much stronger prompt"},
     "v1": {"mode": "envguard", "sanity": False, "templates": False, "model": True,
            "label": "model writes exploits, every candidate executed"},
     "v2": {"mode": "envguard", "sanity": True, "templates": False, "model": True,
@@ -78,12 +85,13 @@ def score(rows: list[dict]) -> dict:
     }
 
 
-def run_baseline(tasks, model: str) -> list[dict]:
+def run_baseline(tasks, model: str, hardened: bool = False) -> list[dict]:
     from baseline import judge  # noqa: PLC0415
 
     rows = []
     for index, task in enumerate(tasks):
-        verdict = judge(task, model=model, seed=1000 + index)
+        # Same seeds as v0 so the two prompts are compared on identical draws.
+        verdict = judge(task, model=model, seed=1000 + index, hardened=hardened)
         rows.append({
             "task_id": task.id,
             "truth_broken": task.broken,
@@ -251,7 +259,7 @@ def main() -> int:
 
     started = time.monotonic()
     if config["mode"] == "baseline":
-        rows = run_baseline(tasks, args.model)
+        rows = run_baseline(tasks, args.model, hardened=config.get("hardened", False))
     else:
         rows = run_envguard(tasks, config, args.model)
     elapsed = time.monotonic() - started

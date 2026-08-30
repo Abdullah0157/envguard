@@ -21,10 +21,10 @@
     "accuracy": 0.8667
   },
   "totals": {
-    "wall_clock_s": 856.4,
-    "model_calls": 18,
-    "model_tokens": 2264,
-    "attacks_executed": 18,
+    "wall_clock_s": 1063.6,
+    "model_calls": 17,
+    "model_tokens": 2121,
+    "attacks_executed": 17,
     "usd_cost": 0.0
   },
   "environment": {
@@ -62,7 +62,7 @@
         ]
       },
       "reason": "A model-written wrong solution passed; it disagrees with the reference on 3 of 4 probes. Exploit attached and reproduced.",
-      "duration_s": 5.67,
+      "duration_s": 6.14,
       "model_calls": 1,
       "model_tokens": 75,
       "equivalent_candidates": 0,
@@ -98,7 +98,7 @@
         ]
       },
       "reason": "A model-written wrong solution passed; it disagrees with the reference on 3 of 8 probes. Exploit attached and reproduced.",
-      "duration_s": 6.08,
+      "duration_s": 5.81,
       "model_calls": 1,
       "model_tokens": 84,
       "equivalent_candidates": 0,
@@ -129,9 +129,9 @@
         ]
       },
       "reason": "A model-written wrong solution passed; it disagrees with the reference on 2 of 14 probes. Exploit attached and reproduced.",
-      "duration_s": 18.83,
+      "duration_s": 16.81,
       "model_calls": 2,
-      "model_tokens": 234,
+      "model_tokens": 250,
       "equivalent_candidates": 0,
       "attacks_executed": 2
     },
@@ -165,7 +165,7 @@
         ]
       },
       "reason": "A model-written wrong solution passed; it disagrees with the reference on 3 of 4 probes. Exploit attached and reproduced.",
-      "duration_s": 5.02,
+      "duration_s": 5.36,
       "model_calls": 1,
       "model_tokens": 70,
       "equivalent_candidates": 0,
@@ -196,7 +196,7 @@
         ]
       },
       "reason": "A model-written wrong solution passed; it disagrees with the reference on 2 of 14 probes. Exploit attached and reproduced.",
-      "duration_s": 6.84,
+      "duration_s": 6.61,
       "model_calls": 1,
       "model_tokens": 95,
       "equivalent_candidates": 0,
@@ -232,7 +232,7 @@
         ]
       },
       "reason": "A model-written wrong solution passed; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
-      "duration_s": 7.96,
+      "duration_s": 7.26,
       "model_calls": 1,
       "model_tokens": 114,
       "equivalent_candidates": 0,
@@ -268,9 +268,9 @@
         ]
       },
       "reason": "A model-written wrong solution passed; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
-      "duration_s": 5.55,
+      "duration_s": 5.2,
       "model_calls": 1,
-      "model_tokens": 77,
+      "model_tokens": 75,
       "equivalent_candidates": 0,
       "attacks_executed": 1
     },
@@ -282,12 +282,12 @@
       "verdict": "CLEAN",
       "action": "SHIP - survived every attack",
       "evidence": null,
-      "reason": "Survived 0 executed attack(s).",
-      "duration_s": 127.69,
-      "model_calls": 0,
-      "model_tokens": 0,
+      "reason": "Survived 1 executed attack(s).",
+      "duration_s": 124.39,
+      "model_calls": 1,
+      "model_tokens": 171,
       "equivalent_candidates": 0,
-      "attacks_executed": 0
+      "attacks_executed": 1
     },
     {
       "task_id": "t09_fizzbuzz",
@@ -298,7 +298,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 0 executed attack(s).",
-      "duration_s": 125.07,
+      "duration_s": 137.26,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -312,12 +312,12 @@
       "verdict": "CLEAN",
       "action": "SHIP - survived every attack",
       "evidence": null,
-      "reason": "Survived 3 executed attack(s).",
-      "duration_s": 38.45,
-      "model_calls": 3,
-      "model_tokens": 501,
+      "reason": "Survived 1 executed attack(s).",
+      "duration_s": 170.73,
+      "model_calls": 1,
+      "model_tokens": 184,
       "equivalent_candidates": 0,
-      "attacks_executed": 3
+      "attacks_executed": 1
     },
     {
       "task_id": "t11_is_palindrome",
@@ -328,9 +328,9 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 3 executed attack(s).",
-      "duration_s": 24.98,
+      "duration_s": 28.06,
       "model_calls": 3,
-      "model_tokens": 303,
+      "model_tokens": 292,
       "equivalent_candidates": 0,
       "attacks_executed": 3
     },
@@ -343,7 +343,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 1 executed attack(s).",
-      "duration_s": 143.87,
+      "duration_s": 161.06,
       "model_calls": 1,
       "model_tokens": 235,
       "equivalent_candidates": 0,
@@ -358,7 +358,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 3 executed attack(s).",
-      "duration_s": 77.96,
+      "duration_s": 93.25,
       "model_calls": 3,
       "model_tokens": 476,
       "equivalent_candidates": 0,
@@ -373,7 +373,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 0 executed attack(s).",
-      "duration_s": 128.32,
+      "duration_s": 148.6,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -388,7 +388,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 0 executed attack(s).",
-      "duration_s": 134.06,
+      "duration_s": 147.0,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,

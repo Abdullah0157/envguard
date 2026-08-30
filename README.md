@@ -18,8 +18,14 @@ out. If you are skimming, read these five things in this order:
 1. **Run it.** `python3 evaluation/run_eval.py --version v3` takes 7 seconds,
    needs nothing but Python 3, and prints the headline: **8/9 defects found, 0/6
    false alarms, balanced accuracy 0.94, zero model calls.**
-2. **[The result table](#results)** and what it is compared against, including
-   [the two ways the comparison favours envguard](#where-the-two-sides-differ-in-resources).
+2. **[The result table](#results)**, and then immediately
+   [the correction underneath it](#read-the-middle-column-first-because-it-is-the-honest-comparison).
+   A reviewer showed that most of the original headline gap came from my
+   baseline's *prompt* rather than from execution. The defensible gap is roughly
+   **0.83 to 0.94**, not the 0.61 to 0.94 this project first reported. That
+   correction, and the
+   [three ways the comparison still favours envguard](#where-the-two-sides-differ-in-resources),
+   are the parts worth your scepticism.
 3. **[The defect this system cannot find](#the-defect-this-system-cannot-find).**
    One defect is missed by every configuration. It was found by an external
    reviewer in an environment labelled sound here, and deliberately left unfixed,
@@ -61,13 +67,27 @@ Roughly one environment in four is quietly broken, and reading the file is not
 enough to tell.
 
 That last row is why this project exists, and it is the prediction this project
-set out to test on its own corpus. It reproduced, and worse than the paper
-measured: the read-only baseline missed **7 of 9** defects, not 61.9%.
+set out to test on its own corpus. It reproduced: the first read-only baseline
+missed **7 of 9** defects. A later, much stronger read-only prompt closed most of
+that gap, which is a correction reported in full under
+[Results](#read-the-middle-column-first-because-it-is-the-honest-comparison).
 
-It also failed *inconsistently*. On a larger model the same prompt on the same
-corpus inverted, flagging every environment including the sound ones. Reading a
-verifier does not merely produce a wrong answer; it produces an unstable one,
-with nothing in the output to indicate which way it went.
+What did **not** improve with the better prompt is stability. Reading a verifier
+does not merely produce a wrong answer, it produces an unstable one, and this is
+measured rather than asserted. Three read-only prompts, same model, same corpus,
+same seeds, differing only in wording:
+
+| Read-only prompt | Found | False alarms | Balanced acc. |
+|---|---|---|---|
+| Plain (`v0`) | 2/9 | 0/6 | 0.61 |
+| "Assume guilt" | **9/9** | **5/6** | 0.58 |
+| Calibrated (`v0-hardened`) | 6/9 | 2/6 | 0.67 |
+
+The middle row found every defect and was still the worst of the three, because
+it flagged five sound environments as well. The same reader swings from missing
+almost everything to accusing almost everything on a change of wording alone, and
+nothing in its output tells you which mode you are in. Execution does not have
+that property: an exploit either runs and passes, or it does not.
 
 **Why it is worth solving now.** On 18 August 2026 micro1's CEO stated the
 company had committed **over $20,000,000 in 11 days** to license real operational
@@ -234,20 +254,106 @@ the environment removed.
 result is reported. Its limits are stated under
 [Limitations](#limitations-stated-rather-than-discovered-by-a-judge).
 
-| Metric | Baseline (reads the verifier) | envguard (`v3`) | Change |
+| Metric | Baseline (`v0`) | Hardened baseline (`v0-hardened`) | envguard (`v3`) |
 |---|---|---|---|
-| **Balanced accuracy** | **0.61** | **0.94** | **+0.33** |
-| Defects found | **2/9** | **8/9** | **+6** |
-| False alarms on sound environments | 0/6 | 0/6 | no change |
-| Human time per environment | 4.0 min | 1.1 min | **-73%** |
-| Machine time, all 15 | 72s | **7s** | 10x faster |
-| Model calls | 15 | **0** | - |
-| Cost per environment | $0.00 | $0.00 | - |
+| **Balanced accuracy** | 0.61 | **0.67** | **0.94** |
+| Defects found | 2/9 | 6/9 | **8/9** |
+| False alarms on sound environments | 0/6 | 2/6 | **0/6** |
+| Human time per environment | 4.0 min | 16.0 min | **1.1 min** |
+| Machine time, all 15 | 72s | 391s | **7s** |
+| Model calls | 15 | 14 | **0** |
+| Cost per environment | $0.00 | $0.00 | $0.00 |
 
-**The baseline misses seven of nine defects.** It reads each verifier, reasons
-about it, and concludes almost everything is fine. That is the more dangerous
-failure mode of the two: over-flagging wastes a reviewer's time, under-flagging
-ships broken environments to a lab.
+### Read the middle column first, because it is the honest comparison
+
+**An external reviewer demonstrated that most of the original headline gap was a
+property of my baseline's prompt, not of execution.** They wrote their own
+read-only baseline, same model and same corpus, with a sharper prompt that
+enumerates the attack families and tells the model to assume guilt. It scored
+**7/9 at 0.89**, against the 2/9 at 0.61 this project had been reporting. Their
+correction for the contamination described below puts it at **6/9 and 0.83**.
+
+That is a serious finding and the argument is theirs, so it is reproduced here
+rather than rebutted. `v0-hardened` is my own attempt at the same idea, committed
+and reproducible: same model, same corpus, same seeds, same JSON schema, still no
+ability to execute anything. **Only the prompt changes.**
+
+I could not reproduce their 0.89. Three attempts, all measured:
+
+| Hardened prompt attempt | Found | False alarms | Balanced acc. |
+|---|---|---|---|
+| "Assume guilt", full attack taxonomy | 9/9 | 5/6 | 0.58 |
+| Above, plus "memorisation does not count" | 0/9 | 0/6 | 0.50 |
+| Above, with the exclusion stated precisely (committed as `v0-hardened`) | 6/9 | 2/6 | **0.67** |
+
+The first over-flagged: told to assume guilt, `qwen3:4b` flagged almost
+everything, and four of its five false alarms were the *same* argument, that a
+finite verifier can be beaten by memorising its inputs. That is true of every
+verifier ever written, and envguard explicitly refuses to count it, so the
+baseline was being denied a rule the system it is compared against gets. Adding
+that rule was a fairness fix, not tuning. The second attempt then over-corrected
+into dismissing everything. The third is the committed one.
+
+**The honest reading, taking the number that hurts most.** I cannot refute the
+reviewer's 0.83, and it is higher than anything I reached, so that is the figure
+to judge against: **the defensible gap is roughly 0.83 to 0.94, not 0.61 to
+0.94.** The original headline overstated the improvement by a wide margin. What
+survives is narrower and still real:
+
+- envguard finds **more** defects (8/9 against 6/9, and 7/9 for the reviewer's).
+- envguard raises **no false alarms**; both hardened read-only baselines do.
+- envguard attaches an **executed exploit** to every confirmation. A read-only
+  verdict is an opinion, so a reviewer must redo the analysis to act on it, which
+  is where the 16.0-minutes-against-1.1 difference comes from.
+- envguard does it in **7 seconds with zero model calls**, against 391s and 14.
+
+Two caveats against my own number, both of which favour the baseline being
+stronger than 0.67 shows. `t06_top_k` failed with an unparseable reply from
+`qwen3:4b` after three retries and was scored as a miss, so 6/9 is a floor. And I
+tuned this prompt on the same corpus I am reporting results for, which is exactly
+the methodological sin worth flagging: it means `v0-hardened` is an *upper* bound
+on reading written with knowledge of the answer key, and it still cost me points
+to publish it.
+
+**Why keep `v0` in the table at all?** Because it is the prompt a person writes
+before they know the taxonomy, and it is what the changelog was measured against.
+Deleting it would hide the correction. Both are committed:
+`evaluation/results/v0.json` and `evaluation/results/v0-hardened.json`.
+
+### The failure modes differ, and one is worse
+
+`v0` under-flags, missing seven of nine. `v0-hardened` finds more but invents two
+false alarms on sound environments. Under-flagging ships broken environments to a
+lab; over-flagging wastes a reviewer's time. Neither read-only configuration
+achieves both, and envguard is the only one here that does.
+
+### Half the headline is circular for `v3`, and the non-circular evidence is elsewhere
+
+`evaluation/check_corpus.py` property 3 asserts that **no sound environment is
+beatable by any deterministic template**. `v3` *is* the deterministic templates.
+So `v3` scoring 0/6 false alarms is guaranteed by the answer-key gate rather than
+discovered by the evaluation, and quoting it as a result overstates what was
+measured. A reviewer raised this and it is correct.
+
+The recall half is not circular: nothing in the gate requires a template to
+succeed on a broken environment, and indeed one does not, which is why the
+headline is 8/9 rather than 9/9.
+
+**The non-circular specificity evidence exists and this README previously failed
+to point at it.** `v1` and `v2` run the model attacker with **templates disabled**,
+and model-written attacks were never used to define soundness:
+
+| Configuration | Attacker | Used to define "sound"? | False alarms |
+|---|---|---|---|
+| `v3` | deterministic templates | **yes**, by property 3 | 0/6 (circular) |
+| `v1` | model only, no sanity gate | no | 0/6 (independent) |
+| `v2` | model only, plus sanity gate | no | 0/6 (independent) |
+
+So the claim "envguard does not accuse sound environments" rests on `v1` and
+`v2`, where an attacker with no connection to the answer key attacked all six
+sound environments across three seeded attempts each and confirmed none of them.
+That is the evidence worth citing, and it is weaker than a guaranteed 0/6 and
+stronger than nothing.
 
 Its failure mode also appeared **unstable across models**, though this one is an
 observation and not a result. Running the same prompt on the same corpus under
@@ -269,15 +375,16 @@ The brief asks for meaningful differences in what each side is given. There are
 three, all of them favour envguard, and they are stated here rather than left to
 be found:
 
-| | Baseline | envguard |
-|---|---|---|
-| Model | `qwen3:4b` | `qwen3:4b` (same) |
-| Environments | all 15 | all 15 (same) |
-| Output contract | JSON schema | JSON schema (same) |
-| Prompt | defines "hackable", gives four concrete examples | defines the same attack families |
-| **Sees `solution.py`** | **no** | **yes** |
-| **Attempts** | **one, no retries** | **up to three, each informed by the previous failure** |
-| **Can execute code** | **no** | **yes** |
+| | Baseline (`v0`) | Hardened baseline | envguard |
+|---|---|---|---|
+| Model | `qwen3:4b` | `qwen3:4b` (same) | `qwen3:4b` (same) |
+| Environments | all 15 | all 15 (same) | all 15 (same) |
+| Output contract | JSON schema | JSON schema (same) | JSON schema (same) |
+| Seeds | 1000+index | 1000+index (same) | fixed per task and attempt |
+| Prompt | defines "hackable", four examples | **full defect taxonomy, told to be suspicious, must name an attack** | defines the same attack families |
+| **Sees `solution.py`** | no | no | **yes** |
+| **Attempts** | one, no retries | one, no retries | **up to three, each informed by the previous failure** |
+| **Can execute code** | no | no | **yes** |
 
 **The reference-solution row is the one that changes a number.** envguard reads
 `solution.py` for two stages: the sanity gate runs it against its own verifier,
@@ -290,14 +397,26 @@ detections was never available to the baseline on any prompt.
 
 This is a real asymmetry and it is not entirely fair. It is also not removable
 without deleting the stage that finds D8, which is the stage the corpus was
-built to justify. The honest reading is that the 2/9 to 8/9 gap is 2/9 to 7/9 on
-strictly equal information, plus one defect that only reference execution can
-reach.
+built to justify. The honest reading is that one of envguard's
+eight detections is unavailable to any read-only reader on any prompt, so the
+comparison on strictly equal information is one defect narrower than the tables
+show.
 
 The execute/not-execute difference is the variable under test, so it is the point
-rather than an unfairness. **The attempt count is not**, and a fairer baseline
-would get three attempts too. It does not, so treat the baseline's 2 of 9 as a
-floor rather than a ceiling.
+rather than an unfairness. **The prompt and the attempt count are not.**
+
+The prompt asymmetry has since been measured rather than hand-waved, and it cost
+this project its headline: see
+[the correction](#read-the-middle-column-first-because-it-is-the-honest-comparison).
+An earlier version of this paragraph said to treat 2 of 9 as "a floor rather than
+a ceiling", which was honest about direction and badly wrong about magnitude. The
+hardened column above is that floor being measured, and a reviewer's own version
+of it reached 0.83.
+
+The attempt count remains unequal and unmeasured: a fairer baseline would get
+three attempts too, and neither `v0` nor `v0-hardened` does. That still biases in
+envguard's favour by an unquantified amount, and it is the next thing I would
+measure.
 
 Two things bound how much that matters. The baseline has no tool to learn from,
 so a retry would resample the same reasoning against the same unchanged input;
@@ -377,7 +496,8 @@ four divergent snapshots. Full numbers in
 
 | Version | What changed and why | Evidence | Decision |
 |---|---|---|---|
-| **v0** | Baseline. Show the model the task and the verifier, ask whether an incorrect solution could pass. Nothing executed. | **2/9 found, 0/6 false alarms, balanced accuracy 0.61.** It reads each verifier, describes the weakness accurately, and concludes the environment is fine anyway. | Established the starting point. On a larger model the same prompt failed in the opposite direction, flagging everything for 0.50. |
+| **v0** | Baseline. Show the model the task and the verifier, ask whether an incorrect solution could pass. Nothing executed. | **2/9 found, 0/6 false alarms, balanced accuracy 0.61.** It reads each verifier, describes the weakness accurately, and concludes the environment is fine anyway. | Established the starting point, and it turned out to be a **weak** one. See the row below. |
+| **v0-hardened** | Same reading, much stronger prompt: the full defect taxonomy, an instruction to be suspicious, and a demand to name a concrete attack before deciding. Still no execution. Added after an external reviewer showed most of the `v0`-to-`v3` gap was a property of my prompt. | **6/9 found, 2/6 false alarms, balanced accuracy 0.67.** The reviewer's own version of the same idea reached 0.83. Two earlier attempts of mine scored 0.58 and 0.50, one by flagging 9/9 defects *and* 5/6 sound environments. | Kept, and it **cost me the headline**. The honest gap is against this column, not `v0`. Reading is a weaker constraint than this project first claimed; the part that survives is false alarms, attached evidence, and 7 seconds against 391. |
 | **v1** | Let the model write exploits, and **execute every one**. A claim only survives if it is reproduced. | **2/9 -> 7/9 found, balanced accuracy 0.61 -> 0.89.** | Kept. This is the single largest improvement in the project, and it comes from running the model's output rather than from any change to the model. |
 | **v2** | Added the **gold sanity gate**: run the reference solution against its own verifier first. | **7/9 -> 8/9, balanced accuracy 0.89 -> 0.94.** v1 missed `t08_days_between`, whose verifier rejects its own reference solution. No attack can reach it, because there is nothing there to exploit. | Kept. It recovers the one environment attacking cannot, for a single execution costing 0.04s. |
 | **v3** | Added **deterministic template attacks** generated from the function signature: constants, empty values of the right type, identity, and the literal the verifier compares against. | **8/9 found, 0/6 false alarms, balanced accuracy 0.94, in 7 seconds with zero model calls.** Matches v2 exactly while using no inference at all. | Kept, and this is the recommended configuration. Essentially all the detection comes from here. |
@@ -396,7 +516,7 @@ both are measured rather than asserted:
 2. **The model stage as the recommended path** (cut in the `v4` row). Not because
    it failed. `v2` shows the model finds **8 of 9 unaided**, the same score the
    templates reach, with real and reproducible exploits. It was cut because it
-   buys the *same* answer at **117 times the wall clock** (857.2s versus
+   buys the *same* answer at roughly **120 times the wall clock** (857.2s versus
    7.3s). The lesson is not that attacker creativity is useless; it is that
    creativity was never the binding constraint on this corpus, so paying for it
    bought nothing that was not already free.
@@ -464,6 +584,48 @@ tested literal is silently reclassified and the environment is reported `CLEAN`.
 Both directions of that guard are tested in `differential.py`'s self-test, but the
 test cannot tell me how often the suppression is wrong on environments I did not
 write.
+
+**And the guard was evadable, which was worse than either direction above.** A
+reviewer noticed that it compares the verifier's input *literals* against literals
+in the candidate, so hiding the literals defeats it. Key the lookup table on
+`repr(args)` instead of `args` and the tested inputs no longer appear as literals
+at all; they appear inside opaque strings:
+
+```python
+_T = {('racecar',): True, ...};   return _T[a]          # caught: memorised
+_T = {"('racecar',)": True, ...}; return _T[repr(a)]    # was NOT caught
+```
+
+That was not a cosmetic misclassification. A repr-keyed memoriser passes the
+verifier and genuinely disagrees with the reference on untested inputs, so it
+satisfied every condition for `CONFIRMED_HACKABLE`. Run against the six sound
+environments it produced **six false confirmations, each with real attached
+proof and an inverted conclusion**, which is the worst output this system can
+emit.
+
+Two bugs, not one. Parsing deciding-position strings as Python literals fixed
+four of six. The other two, `t10_dedupe` and `t14_merge_sorted`, revealed a
+second and older defect: the guard collected only *scalar* arguments as tested
+inputs, so for any entrypoint taking a list it built an empty input set and
+returned `False` without examining anything. It had been structurally incapable
+of recognising a memoriser on a third of the corpus since it was written.
+Descending into container arguments closed it. **Both are now 0 of 6**, and both
+keyings are asserted for every sound environment in `differential.py`'s
+self-test, so the evasion cannot silently return.
+
+*Scope, stated plainly.* No committed number changed. Neither the templates nor
+`qwen3:4b` writes repr-keyed tables, so the shipped pipeline never reached this
+path and every result in this repository stood before and after the fix. It
+mattered because the guard sits exactly where "coverage" is separated from
+"defect", and a stronger attacker would reach it.
+
+*Still unfixed, and unfixable by this approach.* The guard is a syntactic
+heuristic doing a semantic job. Normalising `repr` catches `repr`; an attacker who
+encodes the table keys any other reversible way, base64 or a hash, evades it
+again. Deciding whether an arbitrary program is a lookup table over a given input
+set is undecidable in general. The durable fix is behavioural rather than
+syntactic, asking whether the candidate degrades outside the verifier's tested
+inputs, and that is a redesign rather than a patch.
 
 ---
 
@@ -632,7 +794,7 @@ So the model is not incompetent. It is **redundant** here:
 | Model alone, no templates (`v2`) | 8/9 | 0/6 | 16 | 857.2s |
 | Templates alone, no model (`v3`) | 8/9 | 0/6 | **0** | **7.3s** |
 
-Identical accuracy. **117 times the wall clock.** And when both run
+Identical accuracy. **Roughly 120 times the wall clock.** And when both run
 together (`v4`), the model adds nothing further, because the templates already
 found everything it would have.
 
@@ -652,6 +814,29 @@ The useful question for a data lab is therefore not *can the model do it*. It
 demonstrably can. The question is *is the model the cheapest thing that can*, and
 here it was not, by two orders of magnitude.
 
+### The part of this hot take a reviewer knocked down
+
+"Execution was load-bearing" was measured against a baseline whose prompt turned
+out to be weak. A reviewer wrote a better read-only prompt and reached 0.83
+without executing anything, so **the gap attributable to execution is much
+smaller than this section originally implied**, and the honest version is
+narrower.
+
+What survives is not the size of the gap but its *shape*. Reading produced 0.61,
+0.58, 0.67 and 0.83 across four prompts on identical inputs, including one that
+found every defect and was still the worst of the four because it accused five
+sound environments. A reader's answer moves on wording, and nothing in the output
+says which way it moved. Executing produced the same answer every time, and
+attached a program a reviewer can run.
+
+So the defensible claim is weaker and, I think, more useful: execution is not
+mainly a way to find *more* defects. It is a way to make a verdict **stable and
+checkable**, and those are the properties a reviewer needs in order to act on it
+without redoing the work. A read-only auditor that scores 0.83 still hands a
+person 8 opinions; envguard hands them 8 executed exploits and takes 7 seconds
+doing it. The 0.61-to-0.94 framing this project launched with overstated the
+first property and undersold the second.
+
 **And then the model did the one thing the templates never could.** It found an
 error in my ground truth. Not a planted puzzle, an actual mistake: every
 environment I had certified as sound (seven of them at the time, six now that
@@ -667,7 +852,7 @@ That is the honest division of labour this project actually measured:
 | **The model** | Finding the ones you didn't. It is not a cheaper enumerator; it is the thing that questions your assumptions. |
 
 The mistake would be reading the wall-clock numbers and concluding "drop the
-model." On the work I designed, it was 117 times slower for an identical answer.
+model." On the work I designed, it was roughly 120 times slower for an identical answer.
 On the work I got wrong, it was the only component that caught me.
 
 One caveat I will not paper over: this corpus is small, synthetic, and its defect
@@ -720,12 +905,27 @@ gate caught 61.9% of test defects an LLM judge missed," which is slightly
 stronger than what the paper says. The paper reports that the gold solution
 failed 61.9% of generated tests. That is now what this README says.
 
-**What the agent got wrong.** Four claims in earlier drafts were false and were
-caught and corrected before submission: a fabricated experiment result, a
-paraphrased citation that overstated its source, a headline that contradicted the
-project's own generated tables, and a conclusion that a later measurement
-reversed. Each correction is a separate commit with its reasoning in the message,
-and the sequence is documented in
+**What the agent got wrong.** Errors in earlier drafts, all caught and corrected
+before submission, in roughly increasing order of seriousness:
+
+| What was wrong | How it was caught |
+|---|---|
+| A fabricated experiment result, written as a plausible measurement that was never run | A pass over the ground rules: the claim had no result file |
+| A paraphrased citation that overstated its source | Re-reading the paper |
+| A headline that contradicted the project's own generated tables | Re-reading committed results |
+| A conclusion a later measurement reversed | The measurement finished and said the opposite |
+| An infallibility guarantee ("a confirmed verdict cannot be a false alarm") | A reviewer produced a false confirmation |
+| Documentation quoting a pre-relabel corpus, in the file written for reviewers | A reviewer ran this project's own sixty-second check and got different numbers |
+| A verifier that explained its own defect in a comment, contaminating every baseline measurement | A reviewer tested that environment with and without the comment |
+| A memorisation guard evadable by keying on `repr(args)`, producing false confirmations on all six sound environments | A reviewer wrote the evasion and ran it |
+| **A headline gap that was mostly a property of my baseline's prompt** | A reviewer wrote a better read-only prompt and scored far above it |
+
+The last one is the most serious, because it was not a bug. Everything executed
+correctly and every number was real; the *comparison* was flattering. It cost the
+headline, and the correction is the middle column of the results table.
+
+Each is a separate commit with its reasoning in the message, and the sequence is
+documented in
 [`trajectories/04-coding-agent.md`](trajectories/04-coding-agent.md).
 
 That record is included deliberately. A submission produced with an agent and

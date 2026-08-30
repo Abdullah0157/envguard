@@ -29,6 +29,8 @@ Exit codes: 0 all consistent, 1 a document contradicts the evidence.
 
 from __future__ import annotations
 
+import ast
+import glob
 import json
 import os
 import re
@@ -58,6 +60,16 @@ def read(name: str) -> str:
         return fh.read()
 
 
+def load_all() -> dict:
+    """Every committed result file, keyed by version. Discovered, not listed."""
+    found = {}
+    for path in sorted(glob.glob(os.path.join(RESULTS, "*.json"))):
+        with open(path, encoding="utf-8") as fh:
+            payload = json.load(fh)
+        found[payload["version"]] = payload
+    return found
+
+
 def load(version: str) -> dict:
     with open(os.path.join(RESULTS, f"{version}.json"), encoding="utf-8") as fh:
         return json.load(fh)
@@ -80,15 +92,22 @@ def main() -> int:
     tp, fp = v3["metrics"]["true_positives"], v3["metrics"]["false_positives"]
     ba = v3["metrics"]["balanced_accuracy"]
 
-    # The shapes the documents must never contain: any confusion-matrix
-    # denominator that disagrees with the corpus as it actually stands.
-    stale_detected = [
-        f"{n}/{d}" for d in range(1, 20) if d != broken for n in range(0, d + 1)
-    ]
-    # Only the ones that would plausibly be written as a detection rate.
-    watch = {f"{tp}/{d}" for d in range(1, 20) if d != broken}
-    watch |= {f"{fp}/{d}" for d in range(1, 20) if d != sound}
-    del stale_detected
+    # The shapes the documents must never contain: a confusion-matrix denominator
+    # that is neither the broken count nor the sound count.
+    #
+    # Keyed on the DENOMINATOR only. An earlier version watched for {tp}/d and
+    # {fp}/d separately, which flagged "0/9" in a table reporting that a hardened
+    # baseline attempt found 0 of the 9 defects. That is a perfectly valid
+    # detection rate; the check had assumed any "0/d" must be a false-alarm rate.
+    # A denominator of 9 or 6 is always legitimate whatever sits above it.
+    # broken, sound, and the corpus size are all legitimate denominators:
+    # "8/9" defects, "0/6" false alarms, "15/15" environments audited.
+    valid_denominators = {broken, sound, total}
+    watch = {
+        f"{n}/{d}"
+        for d in range(1, 20) if d not in valid_denominators
+        for n in range(0, d + 1)
+    }
 
     for name in DOCS:
         text = read(name)
@@ -110,8 +129,14 @@ def main() -> int:
     # Every balanced accuracy quoted in prose must be one a committed result
     # file actually contains. 0.50 is additionally allowed because it is the
     # arithmetic score of the always-say-hackable stub, not a measurement.
+    # Discovered, not hardcoded. A hardcoded ("v0","v1",...) list failed the
+    # moment v0-hardened was added: the README correctly reported its 0.67 and
+    # the checker called it unsupported, because the checker did not know the
+    # result file existed. Enumerating the directory means a new configuration
+    # is covered the moment it is committed.
     committed_ba = {
-        f"{load(v)['metrics']['balanced_accuracy']:.2f}" for v in ("v0", "v1", "v2", "v3", "v4")
+        f"{payload['metrics']['balanced_accuracy']:.2f}"
+        for payload in (load_all().values())
     }
     allowed_ba = committed_ba | {"0.50"}
     for name in DOCS:
@@ -130,7 +155,7 @@ def main() -> int:
     llm = read(os.path.join("envguard", "llm.py"))
     m = re.search(r'DEFAULT_MODEL\s*=\s*os\.environ\.get\(\s*"ENVGUARD_MODEL"\s*,\s*"([^"]+)"', llm)
     default_model = m.group(1) if m else "?"
-    models_used = {load(v)["model"] for v in ("v0", "v1", "v2", "v3", "v4")}
+    models_used = {payload["model"] for payload in load_all().values()}
     check(
         "envguard/llm.py default model is the one the results were measured with",
         default_model in models_used,
@@ -198,7 +223,7 @@ def main() -> int:
     # -------------------------------------------------------- multiplier claims
     # "N times slower" is a derived figure like any other, so it is checked like
     # any other. A reviewer found 126x, ~120x and 117x coexisting in one README.
-    wall = {v: load(v)["totals"]["wall_clock_s"] for v in ("v0", "v1", "v2", "v3", "v4")}
+    wall = {v: p["totals"]["wall_clock_s"] for v, p in load_all().items()}
     ratios = {
         round(wall[a] / wall[b])
         for a in wall for b in wall
@@ -212,12 +237,74 @@ def main() -> int:
         # The tolerance is deliberately tight (2%, floor of 1). A looser 5% band
         # was tried first and let "94x" pass against a true 97x, which is exactly
         # the kind of near-miss that produced this check in the first place.
-        bad = [c for c in claimed if not any(abs(c - r) <= max(1, 0.02 * r) for r in ratios)]
+        # Tolerance is 15%, not 2%, and the reason is a defect this check found in
+        # itself. Wall clock is machine-dependent and varies between runs: v3 has
+        # been recorded at both 7.3s and 6.8s, which moves the v2/v3 ratio from
+        # 117 to 126 without anything about the system changing. A tight band made
+        # correct prose fail whenever a result file was refreshed, so it was
+        # enforcing precision the measurement cannot support. Documents should
+        # quote one approximate multiplier; this checks they agree with the
+        # evidence and with each other, not that they track timing noise.
+        bad = [c for c in claimed if not any(abs(c - r) <= max(1, 0.15 * r) for r in ratios)]
         check(
             f"{name} quotes no multiplier absent from the committed wall clocks",
             not bad,
             f"found {sorted(bad)}x; committed wall clocks are {wall}, giving "
             f"ratios {sorted(ratios)}",
+        )
+
+    # ------------------------------------------------- corpus contamination
+    # A reviewer found that t08_days_between's verifier carried a comment stating
+    # its own defect in plain English. It was the only commented verifier in
+    # fifteen, and it was the exact environment the README claimed no read-only
+    # baseline could ever flag. With the comment a read-only baseline flags it
+    # every time; without it, never. The structural claim was right on the merits
+    # and false as the corpus shipped.
+    #
+    # A verifier is an artefact under audit, not documentation. Prose inside one
+    # leaks the answer to any reader, so none of them get prose.
+    commented = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "corpus", "tasks", "*", "verifier.py"))):
+        with open(path, encoding="utf-8") as fh:
+            body = fh.read()
+        try:
+            tree = ast.parse(body)
+        except SyntaxError:
+            continue
+        has_docstring = bool(ast.get_docstring(tree))
+        has_comment = any(
+            line.strip().startswith("#") for line in body.splitlines()
+        )
+        if has_comment or has_docstring:
+            commented.append(os.path.basename(os.path.dirname(path)))
+    check(
+        "no verifier explains itself in prose",
+        not commented,
+        f"{commented} contain comments or docstrings. A verifier is the artefact "
+        f"under audit; prose inside one hands the answer to a read-only reader "
+        f"and contaminates every baseline measurement.",
+    )
+
+    # ---------------------------------------------- the hardened baseline exists
+    # The headline comparison must not rest on a weak baseline alone. A reviewer
+    # showed most of the original 0.61-to-0.94 gap was a property of the v0
+    # prompt, so a stronger read-only baseline is now committed and reported.
+    hardened_path = os.path.join(RESULTS, "v0-hardened.json")
+    check(
+        "a hardened read-only baseline is committed",
+        os.path.exists(hardened_path),
+        "evaluation/results/v0-hardened.json is missing. Without it the headline "
+        "compares envguard only against the weakest prompt, which a reviewer "
+        "already demonstrated overstates the improvement.",
+    )
+    if os.path.exists(hardened_path):
+        readme = read("README.md")
+        hardened_ba = f"{load('v0-hardened')['metrics']['balanced_accuracy']:.2f}"
+        check(
+            "README reports the hardened baseline's balanced accuracy",
+            hardened_ba in readme,
+            f"the committed hardened baseline scores {hardened_ba} and the README "
+            f"does not state it, so the honest comparison is not on the page",
         )
 
     # ------------------------------------------------- the work product is linked

@@ -131,7 +131,7 @@ return title
 return 'hello-world-again'
 ```
 
-**Sandbox response:** `exploit` - disagrees with the reference on 3 of 4 probes
+**Sandbox response:** `exploit` - disagrees with the reference on 3 of 13 probes
 
 ---
 
@@ -142,10 +142,10 @@ return 'hello-world-again'
 - **Candidates executed:** 12
 - **Model calls:** 0
 - **Claims retracted after execution:** 0
-- **Wall clock:** 0.6s
+- **Wall clock:** 0.67s
 - **Cost:** $0.00 (local inference)
 
-A wrong solution passed via 'hardcode_expected_0'; it disagrees with the reference on 3 of 4 probes. Exploit attached and reproduced.
+A wrong solution passed via 'hardcode_expected_0'; it disagrees with the reference on 3 of 13 probes. Exploit attached and reproduced.
 
 ### Evidence attached to the verdict
 
@@ -156,8 +156,8 @@ def slugify(title):
 
 Proof this program is genuinely wrong, executed side by side with the reference:
 
-- `args=('',)` reference returns `''`, exploit returns `'hello-world-again'`
 - `args=('a',)` reference returns `'a'`, exploit returns `'hello-world-again'`
 - `args=('ab',)` reference returns `'ab'`, exploit returns `'hello-world-again'`
+- `args=('aa',)` reference returns `'aa'`, exploit returns `'hello-world-again'`
 
 **A human decides what happens next.** envguard never edits, deletes, or ships an environment on its own.

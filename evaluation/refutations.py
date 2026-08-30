@@ -175,7 +175,12 @@ def main() -> int:
         )
 
     text = "\n".join(lines)
-    print(text)
+    # end="" so the piped output is byte-identical to the written file. print()
+    # would append a newline the file does not have, and a reviewer diffing
+    # `refutations.py > /tmp/x` against the committed refutations.md would see a
+    # spurious one-line difference in a document whose whole point is that the
+    # generated artefacts match.
+    print(text, end="")
     if args.write:
         path = os.path.join(ROOT, "evaluation", "refutations.md")
         with open(path, "w", encoding="utf-8") as fh:

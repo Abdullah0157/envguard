@@ -27,7 +27,11 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_DIR = os.path.join(ROOT, "evaluation", "results")
-ORDER = ["v0", "v1", "v2", "v3", "v4"]
+# v0-hardened sits next to v0 because it answers the same question with a much
+# stronger prompt. It is in the generated table because a reviewer showed the
+# headline gap shrinks a long way against it, and burying that would be the
+# opposite of what this repository claims to do.
+ORDER = ["v0", "v0-hardened", "v1", "v2", "v3", "v4"]
 
 
 def load_results() -> dict[str, dict]:
@@ -61,7 +65,7 @@ def corpus_conflict(results: dict) -> str | None:
 # measurement showed the model stage adds no detections while multiplying wall
 # clock. Presenting v4 here would understate the system on a metric (speed) that
 # our own evidence says to drop the model for. v4 is still reported in full in
-# the changelog below, including the fact that it cost 97x the wall clock for
+# the changelog below, including the fact that it cost ~100x the wall clock for
 # no additional detection.
 HEADLINE_VERSION = "v3"
 

@@ -50,14 +50,15 @@ not a degraded one. See the "known miss" section of the README.
 |---|---|---|---|
 | 1 | The sandbox really isolates and really detects | `python3 envguard/sandbox.py` | Anything other than `sandbox self-test: PASS`. 22 checks including timeouts, print bombs, orphaned processes, and forged success tokens. |
 | 2 | The answer key is correct, not just asserted | `python3 evaluation/check_corpus.py` | Anything other than `RESULT: PASS`. It executes every task to prove broken ones are beatable and sound ones are not. |
-| 3 | The baseline finds 2 of 9 and scores 0.61, barely above the 0.50 an always-say-yes stub gets | `python3 evaluation/run_eval.py --version v0` | A balanced accuracy meaningfully above 0.61, or more than 2 defects found. |
+| 3 | The plain read-only baseline finds 2 of 9 at 0.61 | `python3 evaluation/run_eval.py --version v0` | A balanced accuracy meaningfully above 0.61, or more than 2 defects found. |
+| 3b | **A much stronger read-only prompt does far better, and the README says so.** Reading is not the binding constraint the original headline implied | `python3 evaluation/run_eval.py --version v0-hardened` | This scoring at or below `v0`, which would mean the correction in the README overstates the baseline. An external reviewer reached 0.83 with their own prompt; mine reaches 0.67. |
 | 4 | envguard scores 0.94 with zero model calls, missing only `t15_safe_divide` | `python3 evaluation/run_eval.py --version v3` | Fewer than 8/9 found, any false alarm, a nonzero model call count, or a *different* task in the misses list. |
 | 5 | Adding the model *on top of* templates yields +0 detections | `python3 evaluation/run_eval.py --version v4`, compare to v3 | v4 finding a defect that v3 missed. |
-| 5b | The model is redundant, **not** incapable: it finds 8/9 unaided, just 117x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring below 8/9, which would mean the README oversells the model rather than the templates. |
+| 5b | The model is redundant, **not** incapable: it finds 8/9 unaided, just ~120x slower | `python3 evaluation/run_eval.py --version v2`, compare to v3 | v2 scoring below 8/9, which would mean the README oversells the model rather than the templates. |
 | 6 | All 6 checkable claims the baseline made about environments it cleared are false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a count other than 6 of 6. |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
-| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 24 checks, described below. |
+| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 27 checks, described below. |
 
 ### On claim 9, which exists because this project failed it
 
@@ -91,26 +92,35 @@ evidence does not support:
 - every changelog version has a **result file** behind it
 - no document asserts the **retracted provenance claim** ("no number typed by
   hand") except where it is being withdrawn
-- every **"N times slower"** multiplier is within 2% of a real ratio between two
+- every **"N times slower"** multiplier agrees with a real ratio between two
   committed wall clocks
+- **no verifier in the corpus contains a comment or docstring**, because a
+  verifier is the artefact under audit and prose inside one hands the answer to
+  any read-only reader
+- a **hardened read-only baseline is committed**, and the README reports its score
 
-The last two were added after a second review round found `126x`, `~120x` and the
-true `117x` coexisting in one README, and the retracted provenance claim still
-live in three files after being withdrawn in a fourth. Both are the same defect
-as the original: a correction applied in one place and not propagated. Both are
-now mechanical.
+Those were added across three review rounds, each closing the class of defect a
+reviewer had just demonstrated rather than only the instance. The multiplier and
+provenance checks came from a round that found `126x`, `~120x` and `117x`
+coexisting in one README. The verifier-comment check came from a round that found
+`t08_days_between` explaining its own defect in a three-line comment, which was
+real contamination: with the comment a read-only baseline flags it every time,
+without it never.
 
-It was tested the way everything else here is tested. Every finding from two
-rounds of external review was reintroduced into a scratch copy to confirm the
-checker fails on each: the stale detection rate, the stale balanced accuracy, the
-wrong model default, the contradicting trajectory, the retracted provenance
-claim, and two inconsistent multipliers. It catches all of them, failing 8 of its
-24 checks. Removing them returns it to PASS.
+It is tested the way everything else here is tested. Every finding from all three
+review rounds has been reintroduced into a scratch copy to confirm the checker
+fails on each, then removed to confirm it passes.
 
-The tolerance on the multiplier check is deliberately tight, at 2 percent. A
-looser 5 percent band was written first and let a claimed `94x` pass against a
-true `97x`, which is the exact near-miss the check exists to catch. That was
-found by testing the checker rather than by reading it.
+**Two of its own checks were wrong and were caught the same way.** The multiplier
+tolerance started at 5 percent, which let a claimed `94x` pass against a true
+`97x`, the exact near-miss it exists to catch. Tightened to 2 percent, it then
+failed on *correct* prose, because wall clock is machine-dependent: `v3` has been
+recorded at both 7.3s and 6.8s, which moves the same ratio from 117 to 126 with
+nothing about the system changing. It was enforcing precision the measurement
+cannot support. It now allows 15 percent, and the documents quote one approximate
+multiplier rather than tracking timing noise. Separately, the detection-rate check
+flagged a legitimate `0/9` because it assumed any `0/N` must be a false-alarm
+rate; it now keys on the denominator alone.
 
 ---
 
@@ -121,7 +131,26 @@ fair, so here is how to attack the setup itself.
 
 ### Is the baseline deliberately weak?
 
-Read `baseline/baseline.py`. Check that it uses:
+**Yes, the original one was, and this is the most important check on the page.**
+An external reviewer wrote their own read-only prompt and scored far above `v0`,
+which showed that most of the headline gap this project had been reporting was a
+property of my prompt rather than of execution. The response is
+`baseline/baseline.py`'s `HARDENED_SYSTEM_PROMPT`, committed and measured as
+`v0-hardened`:
+
+```bash
+python3 evaluation/run_eval.py --version v0-hardened
+```
+
+It enumerates the corpus's own defect taxonomy, tells the model to be suspicious,
+and demands it name a concrete attack before deciding. Same model, same corpus,
+same seeds, same schema, no execution. Read both prompts and judge whether the
+hardened one is genuinely strong; if you think you can do better, edit it and
+re-run, since the harness does not care what the prompt says. The full correction,
+including the two attempts that scored *worse* than the weak baseline, is under
+Results in the README.
+
+Then check that both use:
 
 - the **same model** as the full system (`DEFAULT_MODEL`, both default to `qwen3:4b`,
   which is the model every committed result in `evaluation/results/` was produced with)

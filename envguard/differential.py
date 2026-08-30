@@ -32,6 +32,10 @@ from sandbox import run_candidate
 GOLD_MODULE = "gold_reference.py"
 MAX_PROBES = 60
 MAX_EXAMPLES = 3
+# Collected before ranking. The sandbox gathers a wider set so the parent can pick
+# the most convincing examples rather than whichever happened to appear first;
+# see _rank_examples.
+COLLECT_EXAMPLES = 12
 
 # Type-directed probe pools. Deterministic and ordered; no randomness, so a
 # rerun of the whole evaluation reproduces byte for byte.
@@ -183,6 +187,123 @@ print("PASS")
 '''
 
 
+def _rank_examples(diffs: list[dict], verifier_src: str, name: str) -> list[dict]:
+    """Order disagreements so the most convincing ones are shown first.
+
+    The evidence attached to a verdict is the whole product: a reviewer is meant
+    to check a demonstration rather than an opinion. Taking whichever
+    disagreements the probe loop happened to find first undercuts that. For
+    `clamp` this system used to report `clamp(0, 0, -1)`, a degenerate call where
+    the upper bound is below the lower bound, when `clamp(5, 0, 2)` was also
+    available and shows the same bug in a form nobody has to squint at.
+
+    Two signals, both derived from the verifier rather than hardcoded:
+
+    1. **Respect the relations the verifier demonstrates.** If every observed call
+       has argument i less than argument j, a probe violating that is arguably
+       outside the function's contract, and it is certainly less persuasive. This
+       is the same inference `build_probes` uses to drop unsorted probes for
+       `merge_sorted`, applied to presentation instead of correctness.
+    2. **Prefer non-degenerate arguments**: more distinct values, fewer zeros and
+       empties, since `(0, 0, -1)` reads as a corner case and `(5, 0, 2)` reads as
+       the ordinary use the function exists for.
+
+    Ranking only. Every example here is a real executed disagreement, and nothing
+    is discarded that would change a verdict.
+    """
+    observed = _call_arguments(verifier_src, name)
+    if not diffs:
+        return diffs
+
+    # Pairwise "argument i < argument j" relations that hold in EVERY observed call.
+    relations: set[tuple[int, int]] = set()
+    numeric = [
+        call for call in observed
+        if call and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in call)
+    ]
+    if numeric:
+        width = min(len(call) for call in numeric)
+        for i in range(width):
+            for j in range(width):
+                if i != j and all(call[i] < call[j] for call in numeric):
+                    relations.add((i, j))
+
+    def score(diff: dict) -> tuple:
+        try:
+            args = ast.literal_eval(diff.get("args", "()"))
+        except (ValueError, SyntaxError):
+            return (0, 0, 0)
+        if not isinstance(args, tuple):
+            args = (args,)
+
+        respected = 0
+        for i, j in relations:
+            if i < len(args) and j < len(args):
+                a, b = args[i], args[j]
+                if isinstance(a, (int, float)) and isinstance(b, (int, float)) and a < b:
+                    respected += 1
+        honours_all = 1 if respected == len(relations) else 0
+
+        try:
+            distinct = len({repr(a) for a in args})
+        except TypeError:
+            distinct = len(args)
+        substantive = sum(1 for a in args if a not in (0, "", None, [], {}))
+        return (honours_all, respected, distinct + substantive)
+
+    return sorted(diffs, key=score, reverse=True)
+
+
+def _add_stringified(value, deciding: set) -> None:
+    """Unwrap a string that is itself the *repr* of a tested input.
+
+    Closes an evasion an external reviewer found and demonstrated. The guard
+    below compares the verifier's input literals against literals appearing in
+    deciding positions in the candidate. A lookup table keyed on the raw values
+    is caught:
+
+        _T = {('racecar',): True, ...};  return _T[a]        -> memorised
+
+    but the same table keyed on repr() is not, because the tested inputs no
+    longer appear as literals at all. They appear inside opaque strings:
+
+        _T = {"('racecar',)": True, ...};  return _T[repr(a)]  -> NOT caught
+
+    That mattered more than a missed classification. A repr-keyed memoriser
+    passes the verifier and genuinely disagrees with the reference on untested
+    inputs, so it satisfied every condition for CONFIRMED_HACKABLE. Run against
+    the six sound environments in this corpus it produced six false
+    confirmations, each with real attached proof and an inverted conclusion,
+    which is the worst output this system can emit.
+
+    Parsing deciding-position strings as Python literals collapses the evasion:
+    "('racecar',)" evaluates to a tuple whose element is a tested input, and the
+    guard fires again. This only ever ADDS to the deciding set, so it cannot
+    clear a candidate the guard previously caught.
+
+    It is a normalisation, not a proof. An attacker who encodes the table keys in
+    any other reversible way, base64 or a hash, evades it again. The general
+    problem is undecidable by syntax; see README.md under "Limitations".
+    """
+    if not isinstance(value, str) or not value:
+        return
+    try:
+        parsed = ast.literal_eval(value)
+    except (ValueError, SyntaxError, MemoryError, TypeError, RecursionError):
+        return
+    stack = [parsed]
+    seen = 0
+    while stack and seen < 1000:  # bounded: candidate source is untrusted input
+        item = stack.pop()
+        seen += 1
+        if isinstance(item, (str, int, float)) and not isinstance(item, bool):
+            deciding.add(item)
+        elif isinstance(item, (tuple, list, set, frozenset)):
+            stack.extend(item)
+        elif isinstance(item, dict):
+            stack.extend(item.keys())
+
+
 def memorises_the_verifier(candidate_src: str, verifier_src: str, name: str) -> bool:
     """True when the candidate keys on the exact inputs the verifier tries.
 
@@ -208,11 +329,28 @@ def memorises_the_verifier(candidate_src: str, verifier_src: str, name: str) -> 
     if not calls:
         return False
 
+    # Collect the tested inputs, descending into container arguments.
+    #
+    # An earlier version collected only scalar arguments, so for any task whose
+    # entrypoint takes a list (dedupe, chunk, merge_sorted, top_k) the input set
+    # came out empty and the guard returned False without examining anything. It
+    # was structurally incapable of recognising a memoriser on a third of the
+    # corpus, which is how two repr-keyed memorisers survived the first fix.
     inputs: list = []
+
+    def collect(value) -> None:
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            inputs.append(value)
+        elif isinstance(value, (tuple, list, set, frozenset)):
+            for element in value:
+                collect(element)
+        elif isinstance(value, dict):
+            for key in value:
+                collect(key)
+
     for call in calls:
         for argument in call:
-            if isinstance(argument, (str, int, float)) and not isinstance(argument, bool):
-                inputs.append(argument)
+            collect(argument)
     if not inputs:
         return False
 
@@ -246,6 +384,7 @@ def memorises_the_verifier(candidate_src: str, verifier_src: str, name: str) -> 
         if isinstance(node, ast.Constant):
             if isinstance(node.value, (str, int, float)) and not isinstance(node.value, bool):
                 deciding.add(node.value)
+                _add_stringified(node.value, deciding)
         elif isinstance(node, (ast.Tuple, ast.List, ast.Set)):
             for element in node.elts:
                 add(element)
@@ -303,7 +442,7 @@ def disagrees_with_reference(
         return False, [], "probe inputs are not serialisable", False
 
     probe_script = PROBE_TEMPLATE.format(
-        name=name, probes=serialised, max_examples=MAX_EXAMPLES
+        name=name, probes=serialised, max_examples=COLLECT_EXAMPLES
     )
 
     result = run_candidate(
@@ -328,7 +467,7 @@ def disagrees_with_reference(
     except json.JSONDecodeError:
         return False, [], "differential report was unreadable", False
 
-    diffs = payload.get("diffs", [])
+    diffs = _rank_examples(payload.get("diffs", []), verifier_src, name)[:MAX_EXAMPLES]
     compared = payload.get("compared", 0)
     if diffs:
         return True, diffs, f"disagrees with the reference on {len(diffs)} of {compared} probes", True
@@ -361,3 +500,70 @@ if __name__ == "__main__":
         print(f"  {task_id:20s} {label:45s} differs={differs!s:5s}  {note}")
         for example in examples[:1]:
             print(f"      e.g. args={example['args']} reference={example['reference']} candidate={example['candidate']}")
+
+    # ---------------------------------------------------------------- guard
+    # The memorisation guard, tested against the evasion that beat it.
+    #
+    # A reviewer showed that keying a lookup table on repr(args) instead of the
+    # raw args hid every tested literal inside opaque strings, so the guard did
+    # not fire, and the memoriser was reported as CONFIRMED_HACKABLE on all six
+    # SOUND environments: six false confirmations with real proof attached. Both
+    # keyings are asserted here so the evasion cannot silently return.
+    import ast as _ast
+    import re as _re
+
+    print("\n  memorisation guard, both keyings, on every SOUND environment:")
+    failures = 0
+    for task in [t for t in tasks.values() if not t.broken]:
+        pairs = []
+        for match in _re.finditer(_re.escape(task.entrypoint) + r"\(", task.verifier_src):
+            i = match.end(); depth = 1; j = i
+            while j < len(task.verifier_src) and depth:
+                depth += (task.verifier_src[j] == "(") - (task.verifier_src[j] == ")")
+                j += 1
+            try:
+                pairs.append(_ast.literal_eval("(" + task.verifier_src[i:j - 1] + ",)"))
+            except (ValueError, SyntaxError):
+                pass
+        namespace: dict = {}
+        exec(compile(task.solution_src, "<solution>", "exec"), namespace)  # noqa: S102
+        reference = namespace[task.entrypoint]
+        # Kept as a list of pairs, not a dict. Keying by the raw arguments here
+        # would raise TypeError for every entrypoint taking a list (dedupe,
+        # chunk, merge_sorted), silently dropping exactly the three environments
+        # where the guard was weakest, which is how they escaped the first fix.
+        answers = []
+        for arguments in pairs:
+            try:
+                answers.append((arguments, reference(*arguments)))
+            except Exception:  # noqa: BLE001 - the reference may reject a probe
+                pass
+        if not answers:
+            continue
+
+        variants = {
+            "repr-keyed": (
+                f"_T = {({repr(k): v for k, v in answers})!r}\n"
+                f"def {task.entrypoint}(*a):\n    return _T[repr(a)]\n"
+            ),
+        }
+        try:  # a tuple reports as Hashable even when its contents are not
+            literal_table = dict(answers)
+        except TypeError:
+            literal_table = None
+        if literal_table is not None:
+            variants["literal-keyed"] = (
+                f"_T = {literal_table!r}\n"
+                f"def {task.entrypoint}(*a):\n    return _T[a]\n"
+            )
+
+        for label, source in variants.items():
+            caught = memorises_the_verifier(source, task.verifier_src, task.entrypoint)
+            if not caught:
+                failures += 1
+            print(f"    [{'ok' if caught else 'FAIL'}] {task.id:26s} {label:14s} "
+                  f"{'classified memorised' if caught else 'ESCAPED THE GUARD'}")
+
+    print(f"\n  memorisation guard: {'PASS' if not failures else f'FAIL ({failures})'}")
+    if failures:
+        raise SystemExit(1)

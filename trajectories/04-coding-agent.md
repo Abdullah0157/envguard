@@ -3,16 +3,18 @@
 **Tool disclosed:** Claude Code, model Claude Opus 5, running locally in a
 terminal against this repository. Used for the entire build.
 
-Unlike the other three trajectories in this directory, this one is not machine
+Unlike the other four trajectories in this directory, this one is not machine
 captured, because the coding agent's transcript contains the operator's private
 conversation. It is instead reconstructed from artefacts that are all committed
 and independently checkable: the git history, the recorded tool outputs quoted
 below, and the test files those outputs came from. Every command here can be
 re-run.
 
-The three moments worth reading are the ones where a **tool response contradicted
-the agent** and changed the design. Those are the retries and human checkpoints
-the brief asks for.
+The moments worth reading are the ones where a **tool response, a committed
+artefact, or an external reviewer contradicted the agent** and changed the design.
+Those are the retries and human checkpoints the brief asks for. They are in
+roughly increasing order of difficulty: the last three were found by reviewers
+attacking, in turn, the code, the documentation, and the experiment itself.
 
 ---
 
@@ -268,15 +270,75 @@ which is the oracle-trust limitation described in the README.
 
 ---
 
+## Checkpoint 8: a reviewer attacked the experiment instead of the code
+
+The third review round did not look for bugs. It attacked the **experimental
+design**, which is where a result like this actually breaks, and it took the
+headline apart.
+
+**Finding 1: most of the headline gap belonged to the baseline's prompt.** The
+reviewer wrote their own read-only baseline, same model and same corpus, with a
+sharper prompt, and scored **7/9 at 0.89** against the 2/9 at 0.61 this project
+had been reporting for `v0`. Corrected for finding 2 below, **6/9 at 0.83**. The
+README had called 2 of 9 "a floor rather than a ceiling", which was honest about
+direction and badly wrong about magnitude, and magnitude was the whole claim.
+
+The response is `v0-hardened`, a committed configuration with the same model,
+corpus, seeds and schema, differing only in prompt. I could not reproduce 0.89.
+Three attempts, all reported: 0.58, 0.50, and 0.67. The first is the interesting
+one, because told to assume guilt the model flagged **9 of 9 defects and 5 of 6
+sound environments**, scoring worse than the weak baseline while finding
+everything. Four of those five false alarms were the same argument, that a finite
+verifier falls to memorising its inputs, which is true of every verifier and which
+envguard explicitly refuses to count. The baseline was being denied a rule the
+system it is compared against gets, so granting it was a fairness correction
+rather than tuning.
+
+The README now leads with **0.83 to 0.94**, the reviewer's number, not mine. It is
+higher than anything I measured and I cannot refute it, so it is the figure that
+costs the most and therefore the one to publish.
+
+**Finding 2: the corpus was contaminated, and it falsified a specific claim.**
+`t08_days_between`'s verifier carried a three-line comment stating its own defect
+in plain English. It was the only commented verifier in fifteen, and it was
+precisely the environment the README claimed "was never available to the baseline
+on any prompt." The reviewer tested it both ways, three seeds each: with the
+comment a read-only baseline flags it every time, without it clears it every time.
+The structural argument about D8 was right on the merits and false as shipped.
+Three lines deleted. The information already lives in `manifest.json` where it
+belongs, and `v0` re-measured at an unchanged 2/9.
+
+**Finding 3: the memorisation guard was evadable, and evading it inverted the
+verdict.** Covered in full under Limitations in the README. Keying a lookup table
+on `repr(args)` hid every literal the guard looks for, and produced
+`CONFIRMED_HACKABLE` with attached proof on **all six sound environments**.
+Fixing it surfaced a second, older bug: the guard collected only scalar arguments,
+so on any list-taking entrypoint it built an empty input set and returned False
+without examining anything. It had never worked on a third of the corpus.
+
+**What is worth noticing about all three.** None was found by running the tests.
+The tests all passed, before and after. Finding 1 required someone to ask whether
+the *comparison* was fair rather than whether the code was correct; finding 2
+required reading the corpus as an adversary rather than as its author; finding 3
+required trying to defeat a guard rather than confirming it fires. A test suite
+answers the questions you thought to ask, which is the same limitation this
+project attributes to a verifier nobody has attacked. Three rounds of review have
+now found, in order: defects in the code, defects in the documentation, and
+defects in the experiment. That is roughly the order of increasing difficulty, and
+the last round is the one that changed a headline number.
+
+---
+
 ## What this trajectory shows about working with a coding agent
 
-Every one of the seven checkpoints is the same shape: **the agent produced
+Every one of the eight checkpoints is the same shape: **the agent produced
 something confident and plausible, and a tool response or a committed artefact
 contradicted it.** The sandbox said a program that ran nothing had passed. The
 validator said the taxonomy was wrong. The differential tester said the exploit
 was correct code. The rulebook said a measurement had no evidence. A later run
 said the conclusion was backwards. A reviewer's fresh clone said the
-documentation described a system that no longer existed.
+documentation described a system that no longer existed. A reviewer's own
+baseline said the headline gap was mostly a property of my prompt.
 
 None of those were caught by the agent reasoning more carefully. They were caught
 by something external that could say no. That is the same lesson the product

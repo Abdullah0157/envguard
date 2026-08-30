@@ -30,9 +30,6 @@ from datetime import date
 
 from solution import days_between
 
-# The expected value is computed rather than written as a literal, and the
-# computation carries an off-by-one: it counts both endpoints. The correct
-# answer is 7, so this verifier rejects its own reference solution.
 expected = (date(2026, 1, 8) - date(2026, 1, 1)).days + 1
 
 assert days_between("2026-01-01", "2026-01-08") == expected
@@ -53,7 +50,7 @@ print("PASS")
 **Tool response:** `FAIL(exit=1)`
 
 ```
-  File "/private/var/folders/t_/v398l7_50qd70wsqmjqbflzw0000gn/T/envguard_i8mv2xz_/verifier.py", line 10, in <module>
+  File "/private/var/folders/t_/v398l7_50qd70wsqmjqbflzw0000gn/T/envguard_f_i5mop1/verifier.py", line 7, in <module>
     assert days_between("2026-01-01", "2026-01-08") == expected
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 AssertionError
@@ -68,7 +65,7 @@ AssertionError
 - **Candidates executed:** 1
 - **Model calls:** 0
 - **Claims retracted after execution:** 0
-- **Wall clock:** 0.04s
+- **Wall clock:** 0.08s
 - **Cost:** $0.00 (local inference)
 
 The reference solution does not pass its own verifier (FAIL(exit=1)). No attack is meaningful until this is fixed.
