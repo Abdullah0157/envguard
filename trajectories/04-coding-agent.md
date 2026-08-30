@@ -155,9 +155,36 @@ new work:
   incoherent. Fixed by reporting the recommended configuration, `v3`, and stating
   in the table why. Commit `21b56e6`.
 - The hot take asserted the model "added nothing" and that "its one independent
-  contribution was a false positive." Then `v2` finished: the model found **8/8
-  unaided**. The claim was false and had to be rewritten to what the evidence
-  supports, that the model is redundant rather than incapable. Commit `145f4d0`.
+  contribution was a false positive." Then `v2` finished: the model found **8 of 9
+  unaided**, the same score the templates reach. The claim was false and had to be
+  rewritten to what the evidence supports, that the model is redundant on this
+  corpus rather than incapable. Commit `145f4d0`.
+
+---
+
+## Checkpoint 6: three external reviewers broke it
+
+Late in the build, three independent reviewers were given fresh clones and asked
+to break the project rather than praise it. They found four defects the agent had
+not:
+
+| Finding | Outcome |
+|---|---|
+| `t15_safe_divide` was labelled sound and is broken: integer division passes because `2 == 2.0` | Relabelled. Neither the templates nor the model can find it, so it is **kept and reported as a miss** |
+| The memorisation guard flagged the reference fizzbuzz solution, because `n % 15 == 0` names a tested input | Fixed: only literals compared *directly* count, not operands of arithmetic |
+| Differential testing convicted a correct `merge_sorted`, having fed it unsorted input outside the function's precondition | Fixed: probe pools now respect invariants the verifier demonstrates |
+| `SUSPECTED` was dead code propping up a design claim, and five paths recorded "could not check" as "verified fine" | Fixed: an unverifiable pass now reaches a human |
+
+The last one is the most instructive. The dead-code finding was cosmetic on its
+face, and underneath it sat a real defect: when the comparison harness failed to
+run, the result was recorded as *no disagreement found*, which clears a candidate.
+"I could not check" and "I checked and it was fine" had the same representation.
+
+**This checkpoint is why the corpus still contains a defect this system cannot
+detect.** The previous day, a task the templates could not beat was deleted. A
+reviewer found that in the git log and named it: the corpus was edited after
+measurement to remove what broke it. Keeping `t15` is the correction, and it costs
+a perfect score.
 
 ---
 
