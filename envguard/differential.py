@@ -75,7 +75,8 @@ def _call_arguments(verifier_src: str, name: str) -> list[tuple]:
     return found
 
 
-def build_probes(verifier_src: str, name: str, arity: int) -> list[tuple]:
+def build_probes(verifier_src: str, name: str, arity: int,
+                 type_override: str | None = None) -> list[tuple]:
     """Deterministic probe inputs, seeded by what the verifier itself uses.
 
     The verifier's own inputs cannot distinguish anything (a passing candidate
@@ -94,7 +95,10 @@ def build_probes(verifier_src: str, name: str, arity: int) -> list[tuple]:
             for call in observed
             if len(call) > position
         ]
-        chosen = type_names[0] if type_names else "int"
+        # type_override is used when the verifier never calls the entrypoint, so
+        # there is nothing to infer from and the default guess was wrong. See the
+        # retry in disagrees_with_reference.
+        chosen = type_override or (type_names[0] if type_names else "int")
         pool = list(POOLS.get(chosen, POOLS["int"]))
         # Keep the observed values too: they anchor the probe set in reality.
         for call in observed:
@@ -232,9 +236,13 @@ def _rank_examples(diffs: list[dict], verifier_src: str, name: str) -> list[dict
         try:
             args = ast.literal_eval(diff.get("args", "()"))
         except (ValueError, SyntaxError):
-            return (0, 0, 0)
+            return (0, 0, 0, 0)
         if not isinstance(args, tuple):
             args = (args,)
+
+        # A disagreement where the ORACLE raises is a poor demonstration: it reads
+        # as the reference being broken rather than the candidate. Rank those last.
+        oracle_ran = 0 if str(diff.get("reference", "")).startswith("raises") else 1
 
         respected = 0
         for i, j in relations:
@@ -249,7 +257,7 @@ def _rank_examples(diffs: list[dict], verifier_src: str, name: str) -> list[dict
         except TypeError:
             distinct = len(args)
         substantive = sum(1 for a in args if a not in (0, "", None, [], {}))
-        return (honours_all, respected, distinct + substantive)
+        return (oracle_ran, honours_all, respected, distinct + substantive)
 
     return sorted(diffs, key=score, reverse=True)
 
@@ -435,42 +443,91 @@ def disagrees_with_reference(
     if not name:
         return False, [], "no entrypoint to compare", False
 
-    probes = build_probes(verifier_src, name, arity)
-    try:
-        serialised = json.dumps([list(p) for p in probes])
-    except (TypeError, ValueError):
-        return False, [], "probe inputs are not serialisable", False
+    # Candidate parameter types, tried in order until the reference stops
+    # crashing on everything.
+    #
+    # A D7 verifier imports the entrypoint and never calls it, so there are no
+    # observed arguments and the type of each parameter is unknowable from the
+    # verifier alone. The old default was int, and for t07_roman, whose entrypoint
+    # takes a numeral string, that made the reference raise TypeError on every
+    # single probe. The attached proof then read "reference raises TypeError,
+    # candidate returns 42" three times, which demonstrates nothing about the
+    # candidate and looks like the reference is the broken one. A reviewer called
+    # it out, correctly.
+    #
+    # The reference is the oracle, so probes on which the oracle cannot run are
+    # worthless. If it raises on all of them, try another type.
+    attempts: list[str | None] = [None]
+    if not _call_arguments(verifier_src, name):
+        attempts += ["str", "list", "int"]
 
-    probe_script = PROBE_TEMPLATE.format(
-        name=name, probes=serialised, max_examples=COLLECT_EXAMPLES
-    )
+    payload = None
+    for type_override in attempts:
+        probes = build_probes(verifier_src, name, arity, type_override=type_override)
+        try:
+            serialised = json.dumps([list(p) for p in probes])
+        except (TypeError, ValueError):
+            return False, [], "probe inputs are not serialisable", False
 
-    result = run_candidate(
-        probe_script,
-        candidate_src,
-        extra_files={GOLD_MODULE: gold_src},
-    )
-    if not result.passed:
-        # The comparison harness itself could not run (candidate fails at import,
-        # crashes the interpreter, loops). Report no evidence rather than guess.
-        return False, [], f"differential harness did not complete ({result.summary()})", False
+        probe_script = PROBE_TEMPLATE.format(
+            name=name, probes=serialised, max_examples=COLLECT_EXAMPLES
+        )
+        result = run_candidate(
+            probe_script,
+            candidate_src,
+            extra_files={GOLD_MODULE: gold_src},
+        )
+        if not result.passed:
+            # The comparison harness itself could not run (candidate fails at
+            # import, crashes the interpreter, loops). Report no evidence rather
+            # than guess.
+            return False, [], f"differential harness did not complete ({result.summary()})", False
 
-    marker = "DIFFJSON:"
-    line = next(
-        (ln for ln in result.stdout.splitlines() if ln.startswith(marker)), None
-    )
-    if line is None:
-        return False, [], "differential harness produced no report", False
+        marker = "DIFFJSON:"
+        line = next(
+            (ln for ln in result.stdout.splitlines() if ln.startswith(marker)), None
+        )
+        if line is None:
+            return False, [], "differential harness produced no report", False
+        try:
+            payload = json.loads(line[len(marker):], strict=False)
+        except json.JSONDecodeError:
+            return False, [], "differential report was unreadable", False
 
-    try:
-        payload = json.loads(line[len(marker):], strict=False)
-    except json.JSONDecodeError:
-        return False, [], "differential report was unreadable", False
+        # Accept this probe set unless the oracle failed on literally everything,
+        # which means the inferred parameter type was wrong and no comparison here
+        # says anything about the candidate.
+        found = payload.get("diffs", [])
+        oracle_dead = bool(found) and all(
+            str(d.get("reference", "")).startswith("raises") for d in found
+        )
+        if not oracle_dead:
+            break
 
     diffs = _rank_examples(payload.get("diffs", []), verifier_src, name)[:MAX_EXAMPLES]
+
+    # Say so when the proof is weak instead of presenting it as if it were not.
+    #
+    # A D7 verifier never calls its entrypoint, so nothing in the environment
+    # reveals what the function accepts and every probe may land outside its
+    # domain. The disagreement is still real (the candidate returns a value where
+    # the reference cannot run at all, so they are certainly not the same
+    # program), but "reference raises" demonstrates far less than "reference
+    # returns 7, candidate returns 42", and a reviewer should be told which one
+    # they are looking at.
+    oracle_never_ran = bool(diffs) and all(
+        str(d.get("reference", "")).startswith("raises") for d in diffs
+    )
     compared = payload.get("compared", 0)
     if diffs:
-        return True, diffs, f"disagrees with the reference on {len(diffs)} of {compared} probes", True
+        note = f"disagrees with the reference on {len(diffs)} of {compared} probes"
+        if oracle_never_ran:
+            note += (
+                " (the reference raises on every probe shown: this verifier never "
+                "calls its own entrypoint, so the input domain could not be "
+                "inferred and the disagreement is weaker evidence than usual)"
+            )
+        return True, diffs, note, True
     return False, [], f"agrees with the reference on all {compared} probes", True
 
 
