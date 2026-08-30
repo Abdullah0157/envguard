@@ -32,6 +32,24 @@ def load_results() -> dict[str, dict]:
     return results
 
 
+def corpus_conflict(results: dict) -> str | None:
+    """Report a mixed-corpus result set, or None when they agree.
+
+    Two configurations measured on different corpus sizes answered different
+    questions, and putting them in one table silently misstates the improvement.
+    This is not hypothetical: two evaluation batches once overlapped and left
+    four results on a 17-task corpus beside one on a 15-task corpus, which would
+    have produced a comparison that looked fine and was meaningless.
+    """
+    sizes = {v: p.get("corpus_size") for v, p in results.items()}
+    distinct = set(sizes.values())
+    if len(distinct) <= 1:
+        return None
+    detail = ", ".join(f"{v}={sizes[v]}" for v in sorted(sizes))
+    return (f"results span different corpus sizes ({detail}). "
+            "Re-run the stale ones before trusting any table built from them.")
+
+
 # The configuration we actually recommend shipping. It is v3, not v4, because the
 # measurement showed the model stage adds no detections while multiplying wall
 # clock. Presenting v4 here would understate the system on a metric (speed) that
@@ -204,6 +222,17 @@ def render() -> str:
     results = load_results()
     if not results:
         return "No results yet. Run: python3 evaluation/run_eval.py --version v4\n"
+
+    conflict = corpus_conflict(results)
+    if conflict:
+        return (
+            "# Results\n\n"
+            f"**Not generated: {conflict}**\n\n"
+            "Refusing to render tables from a mixed-corpus result set. A comparison "
+            "across different corpus sizes would look correct and mean nothing, so "
+            "it is withheld rather than published with a caveat.\n"
+        )
+
     have = ", ".join(v for v in ORDER if v in results)
     parts = [
         "# Results\n",
