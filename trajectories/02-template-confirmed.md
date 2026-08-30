@@ -142,7 +142,7 @@ return 'hello-world-again'
 - **Candidates executed:** 12
 - **Model calls:** 0
 - **Claims retracted after execution:** 0
-- **Wall clock:** 1.11s
+- **Wall clock:** 0.6s
 - **Cost:** $0.00 (local inference)
 
 A wrong solution passed via 'hardcode_expected_0'; it disagrees with the reference on 3 of 4 probes. Exploit attached and reproduced.

@@ -187,6 +187,18 @@ f43ed5c  Verify reproducibility from a clean clone; add third trajectory
 36bc03d  Add VERIFY.md: how to disprove every claim in this repository
 145f4d0  Correct the hot take: the model was redundant, not incapable
 b2b1662  Make the model claim precise in VERIFY.md too
+939767c  Close five gaps found by re-reading the official brief
+afcf0e0  Complete the changelog: v1 isolates the sanity gate's contribution
+5b513c5  Let the headline result run without a model server
+e49f85c  State agent use in full rather than minimising it
+c7e9c77  Stop verification from mutating the evidence it verifies
+ad877a7  Add defects templates cannot reach, and fix the retry that could not learn
+c4cd902  Classify memorisation as a universal attack, not a per-task defect
+eccfaca  Refuse to publish tables built from a mixed-corpus result set
+953a603  Fix three defects found by an external review
+c276465  Correct a mislabelled environment and two detector bugs found by an adversary
+60fde75  Regenerate every derived artifact from the re-measured results
+50fc824  Rewrite every claim the evidence no longer supports
 ```
 
 Every message states what changed and why. `git log -p` shows the full diffs.

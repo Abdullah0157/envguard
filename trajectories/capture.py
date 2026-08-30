@@ -32,12 +32,16 @@ SELECTED = [
     (
         "t11_is_palindrome",
         "01-attacker-retracted.md",
-        "Attacker agent: three attempts, one retraction, correct final verdict",
-        "The most instructive run in the project. The attacker produces a program "
-        "that passes the verifier and asserts it is an exploit. Differential testing "
-        "executes it against the reference solution, finds no disagreement, and "
-        "retracts the claim. Without that step a sound environment is condemned on "
-        "the model's say-so. Note how each failure is fed back into the next prompt.",
+        "Attacker agent: three attempts, two claims withdrawn, correct final verdict",
+        "The most instructive run in the project, and the one that shows the retry "
+        "loop actually learning. Attempt 1 returns True and is rejected by the "
+        "verifier. The failure is fed back verbatim, and attempts 2 and 3 change "
+        "strategy: both key on the exact inputs the verifier tries. That is "
+        "memorisation, a universal attack that defeats every finite verifier and "
+        "therefore says nothing about this one, so both claims are withdrawn and the "
+        "environment is correctly reported CLEAN. An earlier version of this loop "
+        "returned a byte-identical wrong answer on all three attempts, because the "
+        "feedback said only that the attempt had failed and discarded the reason.",
         True,
     ),
     (
@@ -172,6 +176,51 @@ def render(task, title: str, rationale: str, trace: list, report) -> str:
     return "".join(lines)
 
 
+def capture_baseline() -> str:
+    """Record the baseline judge, the other agent in this system.
+
+    It has no tools by design: it reads a verifier and decides. That absence is
+    the variable under test, so its trajectory is one turn with no tool calls,
+    and showing it that way is the point rather than a gap.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "baseline"))
+    from baseline import SYSTEM_PROMPT, USER_TEMPLATE, judge  # noqa: PLC0415
+
+    task = {t.id: t for t in load_tasks()}["t03_slugify"]
+    verdict = judge(task, seed=1002)
+
+    return "".join([
+        "# Baseline judge: one turn, no tools, wrong answer\n",
+        "_Captured from a real run by `trajectories/capture.py`. Not written by hand._\n",
+        "\n**Why this trajectory:** this is the comparison the whole project is "
+        "measured against, and it is included because its *absence of tool calls* is "
+        "the variable under test. It sees the same task and the same verifier as the "
+        "attacker agent. The only thing it cannot do is run code.\n",
+        f"\n**Environment:** `{task.id}`  \n**Ground truth:** BROKEN "
+        f"({task.defect_family})\n",
+        "\n---\n\n## Agent instructions (verbatim)\n\n```\n",
+        SYSTEM_PROMPT.strip(), "\n```\n",
+        "\n## What it was given\n\n```\n",
+        USER_TEMPLATE.format(statement=task.statement.strip(),
+                             verifier=task.verifier_src.strip()).strip(),
+        "\n```\n",
+        "\n## Tools available\n\nNone. This agent cannot execute anything.\n",
+        "\n## What it answered\n",
+        f"\n- **Verdict:** `{'HACKABLE' if verdict['flagged_hackable'] else 'CLEAN'}`\n",
+        f"- **Reason:** {verdict['reason']}\n",
+        f"- **Duration:** {verdict['duration_s']}s\n",
+        "\n## Why it is wrong\n",
+        "\nThe verifier compares against one hardcoded string, so returning that "
+        "string verbatim passes while implementing nothing. `run.sh demo` shows the "
+        "exploit being found and proven in under a second.\n",
+        "\nNote the shape of the failure. The baseline is not vague and it is not "
+        "lazy: it reasons about the verifier and produces a specific, checkable "
+        "claim. It simply never has to find out whether the claim is true. Every "
+        "verdict it gives is an opinion, and the project's entire result is the gap "
+        "between an opinion and an execution.\n",
+    ])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", default=None)
@@ -192,6 +241,12 @@ def main() -> int:
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(text)
         written.append((filename, report.verdict, len(trace)))
+
+    if not args.task:
+        path = os.path.join(OUT_DIR, "05-baseline-judge.md")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(capture_baseline())
+        written.append(("05-baseline-judge.md", "read-only", 1))
 
     print()
     for filename, verdict, steps in written:
