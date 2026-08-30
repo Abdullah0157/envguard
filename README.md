@@ -231,6 +231,32 @@ everything scores. Swap the model and you get the inverse behaviour with no
 signal in the output telling you which one you are holding. Execution does not
 have that property.
 
+### Where the two sides differ in resources
+
+The brief asks for meaningful differences in what each side is given. There is
+one, it favours envguard, and it is stated here rather than left to be found:
+
+| | Baseline | envguard |
+|---|---|---|
+| Model | `qwen3:4b` | `qwen3:4b` (same) |
+| Environments | all 15 | all 15 (same) |
+| Output contract | JSON schema | JSON schema (same) |
+| Prompt | defines "hackable", gives four concrete examples | defines the same attack families |
+| **Attempts** | **one, no retries** | **up to three, each informed by the previous failure** |
+| **Can execute code** | **no** | **yes** |
+
+The execute/not-execute difference is the variable under test, so it is the point
+rather than an unfairness. **The attempt count is not**, and a fairer baseline
+would get three attempts too. It does not, so treat the baseline's 2 of 9 as a
+floor rather than a ceiling.
+
+Two things bound how much that matters. The baseline has no tool to learn from,
+so a retry would resample the same reasoning against the same unchanged input;
+and the failure it exhibits is not hesitancy but confidence, since it describes
+each weakness accurately and clears the environment anyway. Neither argument is a
+measurement, and the honest position is that this comparison is generous to
+envguard by an unquantified amount.
+
 ### The baseline is specific, confident, and wrong
 
 It does not fail by being vague. Every verdict comes with a checkable reason. So
@@ -283,6 +309,7 @@ four divergent snapshots. Full numbers in
 | **v2** | Added the **gold sanity gate**: run the reference solution against its own verifier first. | **7/9 -> 8/9, balanced accuracy 0.89 -> 0.94.** v1 missed `t08_days_between`, whose verifier rejects its own reference solution. No attack can reach it, because there is nothing there to exploit. | Kept. It recovers the one environment attacking cannot, for a single execution costing 0.04s. |
 | **v3** | Added **deterministic template attacks** generated from the function signature: constants, empty values of the right type, identity, and the literal the verifier compares against. | **8/9 found, 0/6 false alarms, balanced accuracy 0.94, in 7 seconds with zero model calls.** Matches v2 exactly while using no inference at all. | Kept, and this is the recommended configuration. Essentially all the detection comes from here. |
 | **v4** | Added **model attacks on survivors only**, so inference runs exactly where cheap methods failed. | **8/9, 0/6, balanced accuracy 0.94, 8 model calls.** Identical detection to v3. **+0 defects for the added inference.** | **Demoted from the headline.** Kept in the codebase, because the one defect nothing here finds is exactly the kind templates cannot express. |
+| **final** | **Combined what worked:** sanity gate, then deterministic templates, then the model on survivors, with every candidate executed and every confirmation checked against the reference. | **8/9 found, 0/6 false alarms, balanced accuracy 0.94.** The recommended configuration (`v3`) reaches this in 7 seconds with zero inference. | **The main contribution is execution, not intelligence.** The step from reading to running took 2/9 to 7/9. Everything after that added 1 more defect between them. |
 | **fix** | **Differential verification.** Removed the pipeline's trust in the attacker's own claim that a candidate was wrong. | Retracted a false `CONFIRMED_HACKABLE` on `t11_is_palindrome` without losing any true detection. Recorded in [`trajectories/01-attacker-retracted.md`](trajectories/01-attacker-retracted.md). | Kept. This is what makes a confirmed verdict trustworthy. |
 
 **What was removed, and what it taught me.** Two things were tried and cut, and
