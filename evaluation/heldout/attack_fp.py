@@ -1,6 +1,11 @@
 """Judge's adversarial pass: try to make envguard CONFIRM a sound environment."""
 import os, sys, ast
-ROOT = "/private/tmp/claude-501/-Users-ahmadabdullah/5e21972b-5cd0-4cde-8d77-488a1299e1e5/scratchpad/judge/envguard-5ad2675"
+# Resolved relative to this file, like its sibling run_heldout.py. It shipped as
+# an absolute path into the scratch directory of the session that authored it,
+# pointing at an older extract, so on any other machine it died with
+# ModuleNotFoundError and on this one it would have silently audited the wrong
+# version. A reviewer caught it.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "envguard"))
 from corpus import Task
 import auditor
