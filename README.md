@@ -10,6 +10,14 @@ Built for the micro1 Frontier Engineering Challenge, August 2026.
 
 ---
 
+> **On the timings in this README.** Every wall clock here was measured on an
+> idle Apple M1. A reviewer running under load measured the same `v3` at 28 to 33
+> seconds against the 7 reported here, and `check_corpus.py` at 76 seconds against
+> ~25, roughly 4 to 8 times slower. **Their verdicts were identical to the
+> committed ones in every case.** Read every duration in this document as "on an
+> idle M1", and expect tens of seconds under load. The accuracy claims are exact
+> and reproduce; the timing claims are the only numbers here that will not.
+
 ## If you have five minutes
 
 This file is long because the argument is checkable and the checks are written
@@ -352,6 +360,42 @@ false alarms on sound environments. Under-flagging ships broken environments to 
 lab; over-flagging wastes a reviewer's time. Neither read-only configuration
 achieves both, and envguard is the only one here that does.
 
+### Held out: 0.92 on ten environments I did not write
+
+The strongest objection to every number above is Limitation 1: I wrote the
+corpus, the taxonomy and the attacks, so the score may be measuring that overlap
+rather than a capability. I stated that and did not test it. **A reviewer tested
+it for me.**
+
+They wrote ten environments this project had never seen, deliberately mixing
+defect shapes inside my taxonomy with shapes outside it, plus sound verifiers
+built to bait a false alarm. Then they ran the shipped `v3` against them,
+unmodified. I re-ran it myself against the current tree:
+
+```
+detected 5/6 defects | false alarms 0/4 sound | recall 0.83 specificity 1.00 balanced acc 0.92
+```
+
+| | My corpus (`v3`) | Held out |
+|---|---|---|
+| Balanced accuracy | 0.94 | **0.92** |
+| Defects found | 8/9 | 5/6 |
+| False alarms | 0/6 | **0/4** |
+
+**0.92 against 0.94 is the single most important number in this project**, and it
+was produced by someone trying to break it. It says the result is mostly not an
+artifact of self-authorship. Zero false alarms on sound environments designed to
+provoke them is the part I would have bet against.
+
+The one miss, `h04_round_half_up`, is a verifier that never tests a `.5` case, so
+Python's banker's rounding passes it. That is the same shape as `t15_safe_divide`,
+which this README already reports as unreachable, so the held-out run reproduced
+my known blind spot rather than finding a new one.
+
+Reproduce it: `python3 evaluation/heldout/run_heldout.py`. The corpus is committed
+under `evaluation/heldout/` with its provenance at the top of the file. **I did
+not write it, I did not tune against it, and the miss is left as a miss.**
+
 ### Half the headline is circular for `v3`, and the non-circular evidence is elsewhere
 
 `evaluation/check_corpus.py` property 3 asserts that **no sound environment is
@@ -397,7 +441,7 @@ comes from a committed `qwen3:4b` result file.
 ### Where the two sides differ in resources
 
 The brief asks for meaningful differences in what each side is given. There are
-three, all of them favour envguard, and they are stated here rather than left to
+four, all of them favour envguard, and they are stated here rather than left to
 be found:
 
 | | Baseline (`v0`) | Hardened baseline | envguard |
@@ -429,18 +473,34 @@ scored as "did not flag", which penalised it for a capability it has.
 **The reference-solution row is the one that changes a number.** envguard reads
 `solution.py` for two stages: the sanity gate runs it against its own verifier,
 and the differential tester uses it as the oracle. The baseline never sees it.
-That is what structurally blocks the baseline from `t08_days_between` (family
-D8), one of the nine defects, because a D8 environment has no exploit to reason
-about at all: its verifier rejects its own correct answer, and the only way to
-observe that is to run the correct answer. So one of envguard's eight
-detections was never available to the baseline on any prompt.
+That was offered as the reason the baseline cannot reach `t08_days_between`
+(family D8), on the argument that a D8 verifier rejects its own correct answer
+and the only way to observe that is to run it.
 
-This is a real asymmetry and it is not entirely fair. It is also not removable
-without deleting the stage that finds D8, which is the stage the corpus was
-built to justify. The honest reading is that one of envguard's
-eight detections is unavailable to any read-only reader on any prompt, so the
-comparison on strictly equal information is one defect narrower than the tables
-show.
+**That argument is wrong, and my own committed evidence disproves it.** A
+reviewer read `v0-hardened.json` and found this, on `t08`:
+
+> The verifier computes expected as `(date(2026, 1, 8) - date(2026, 1, 1)).days + 1`,
+> which is 7 + 1 = 8. But the task says `days_between("2026-01-01", "2026-01-08")`
+> is 7. So the verifier's expected value is wrong (it should be 7, not 8). This
+> makes the environment **broken at the root**.
+
+The reader identified the defect exactly, by arithmetic, without executing
+anything. And the harness scored it as a miss, because `flagged` was `false`.
+
+**The real cause is the verdict schema, not the reader.** It is asked one
+question, "is this hackable", and a D8 environment is broken in the *opposite*
+direction: nothing can pass it, so it is not hackable. Answering "not hackable"
+is defensible for the question asked. The instrument had no way to express
+"broken at the root", so a correct observation was recorded as a failure to
+observe.
+
+That is a defect in my measurement, not a capability gap, and it belongs with
+the schema-ordering finding above: **both are cases where the output contract,
+not the reasoning, determined the score.** The honest statement is narrower:
+envguard reaches D8 automatically, a read-only reader can see it but cannot
+report it through this verdict schema, and a fairer harness would offer a third
+verdict rather than a boolean.
 
 The execute/not-execute difference is the variable under test, so it is the point
 rather than an unfairness. **The prompt and the attempt count are not.**
@@ -483,8 +543,23 @@ very verifier it had cleared. **6 of 6 hold up:**
 | `t15_safe_divide` | "checks multiple specific cases including zero denominator" | `return numerator // denominator` | **passes** |
 
 Read those reasons again. They are **accurate descriptions of the weakness** and
-the baseline still concluded the environment was fine. It saw the hole and did
-not walk through it, because it never had to run anything.
+the baseline still concluded the environment was fine.
+
+An earlier version of this paragraph explained that as "it saw the hole and did
+not walk through it, because it never had to run anything." **This repository's
+own committed files refute that**, and a reviewer caught it. `v0-reason-first`
+uses the same model, prompt and corpus and *does* walk through the hole, flagging
+9 of 9. The only difference is that its output schema lets it reason before
+answering.
+
+So the cause is not that the reader never had to run anything. It is that the
+reader was made to **commit to a boolean before it was allowed to think**, and
+several of these reasons are the model's post-hoc justification for a verdict it
+had already emitted. Four rows in the committed `v0.json` end their reason with
+"so the verifier is hackable" or "making it hackable" while `flagged` is `false`:
+the explanation contradicts the answer it was attached to. That is what
+answer-first decoding produces, and it is measured in
+[`v0-reason-first.json`](evaluation/results/v0-reason-first.json).
 
 Full table, generated by `evaluation/refutations.py`, in
 [`evaluation/refutations.md`](evaluation/refutations.md).
@@ -661,6 +736,66 @@ self-test, so the evasion cannot silently return.
 path and every result in this repository stood before and after the fix. It
 mattered because the guard sits exactly where "coverage" is separated from
 "defect", and a stronger attacker would reach it.
+
+**The probe pool is finite for exactly the same reason the verifier is, and that
+is a false-negative channel.** This one was found by a reviewer, and it is the
+project's own central argument turned on the project's own oracle.
+
+The README argues that a finite list of assertions is always satisfiable by
+memorising the list, so "unhackable" is not a property a finite verifier can
+have. The identical argument applies to `differential.py`'s probe pool. Against
+`t11_is_palindrome`, labelled sound:
+
+```python
+def is_palindrome(text):
+    if len(text) == 6:
+        return False
+    return text == text[::-1]
+```
+
+`is_palindrome("abccba")` should be `True`; this returns `False`. It passes the
+verifier, and the probe pool for that task holds string lengths 0, 1, 2, 3, 5, 7,
+8 and 11 and **no length 6**, so it agrees with the reference on all 14 probes.
+It keys on none of the verifier's inputs, so the memorisation guard correctly
+stays silent. Verdict: `EQUIVALENT`. Environment reported `CLEAN`.
+
+So `CLEAN` is weaker than even the definition stated above. Precisely, it means:
+**no attack succeeded that neither keys on the verifier's tested inputs nor on a
+gap in the probe pool.** A candidate correct on the pool and wrong outside it is
+always constructible, for the same arithmetic reason a memoriser always exists.
+Enlarging the pool raises the cost of constructing one; it cannot close the class.
+
+**The precondition false-positive class is still open, and this README previously
+implied it was closed.** The `merge_sorted` instance was fixed by inferring
+sortedness from the verifier's own calls, and the text said "the bug is fixed",
+which reads as the class being shut. It is not, and `differential.py`'s own source
+comment has said so all along while the README did not carry it forward. Consider
+a `head(items)` whose task statement guarantees a non-empty list. The candidate
+`return items[0] if items else 42` is correct within that contract. The probe
+generator feeds `[]` anyway, the reference raises, the candidate returns 42, and
+that scores as a disagreement: `CONFIRMED_HACKABLE`, with real attached proof and
+an inverted conclusion. No template writes that candidate so no committed number
+changes, but `v4` ships a model that easily could. The guard only infers
+preconditions a verifier happens to demonstrate; one that is stated in prose and
+never exercised is invisible to it.
+
+**The harness-bypass canary is evadable, and the architecture held anyway.** A
+reviewer wrote a candidate that reads `verifier.py` from its own working
+directory and behaves honestly whenever it sees the string `canary`. That defeats
+`is_harness_bypass` on all 15 environments: raw pass `True`, canary fires
+`False`, every time.
+
+The pipeline still issued **no false confirmation**. It returns `UNVERIFIED`,
+which routes to `SUSPECTED` and a human, because of a decision made much earlier
+and for an entirely different reason: refusing to collapse "I could not check"
+into "I checked and it was fine". That refusal was forced by a different reviewer
+finding five paths where the two were conflated, and it turned out to hold under
+an attack it was never designed for. Worth stating plainly because it is the only
+place in this project where defence in depth paid off unplanned.
+
+The residual is real but different in kind: such a candidate forces all 15
+environments into human review. That is a **reviewer-time denial of service**
+rather than a correctness failure, and this system has no defence against it.
 
 *Still unfixed, and unfixable by this approach.* The guard is a syntactic
 heuristic doing a semantic job. Normalising `repr` catches `repr`; an attacker who

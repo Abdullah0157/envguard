@@ -65,7 +65,7 @@ def corpus_conflict(results: dict) -> str | None:
 # measurement showed the model stage adds no detections while multiplying wall
 # clock. Presenting v4 here would understate the system on a metric (speed) that
 # our own evidence says to drop the model for. v4 is still reported in full in
-# the changelog below, including the fact that it cost ~100x the wall clock for
+# the changelog below, including the fact that it cost ~120x the wall clock for
 # no additional detection.
 HEADLINE_VERSION = "v3"
 

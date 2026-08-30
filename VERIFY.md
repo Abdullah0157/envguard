@@ -58,7 +58,7 @@ not a degraded one. See the "known miss" section of the README.
 | 6 | All 6 checkable claims the baseline made about environments it cleared are false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a count other than 6 of 6. |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
-| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 27 checks, described below. |
+| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 33 checks, described below. |
 
 ### On claim 9, which exists because this project failed it
 
@@ -155,7 +155,11 @@ Then check that both use:
 - the **same model** as the full system (`DEFAULT_MODEL`, both default to `qwen3:4b`,
   which is the model every committed result in `evaluation/results/` was produced with)
 - the **same corpus**, all 15 environments
-- the **same structured output contract** (a JSON schema, so it cannot fail on formatting)
+- the **same structured output contract** (a JSON schema, so it cannot fail on
+  formatting). Note that this contract is **not neutral**: the field order inside
+  it changes the result more than most prompt edits do. Same schema mechanism,
+  `reason` before `hackable` instead of after, and the baseline goes from 2/9 at
+  0.61 to 9/9 at 0.50. Committed as `evaluation/results/v0-reason-first.json`
 - a prompt that **explains what hackable means** and gives concrete examples
 
 ```bash

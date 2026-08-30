@@ -41,6 +41,17 @@ RESULTS = os.path.join(ROOT, "evaluation", "results")
 
 DOCS = ("README.md", "REPRODUCTION.md", "VERIFY.md")
 
+# Artifacts that make claims but are not prose, and were therefore outside the
+# perimeter until a reviewer pointed out that two findings survived a revision
+# specifically aimed at this class *because* they lived here. corpus/manifest.json
+# asserted that t15 was "reachable only by the model" when no configuration
+# reaches it, and evaluation/report.html led with a headline the README retracts.
+# A claim is a claim whatever file it is in.
+CLAIM_ARTIFACTS = (
+    os.path.join("corpus", "manifest.json"),
+    os.path.join("evaluation", "report.html"),
+)
+
 failures: list[str] = []
 checks = 0
 
@@ -103,6 +114,19 @@ def main() -> int:
     # broken, sound, and the corpus size are all legitimate denominators:
     # "8/9" defects, "0/6" false alarms, "15/15" environments audited.
     valid_denominators = {broken, sound, total}
+
+    # The externally-authored held-out corpus has its own shape, and the README
+    # quotes rates against it ("5/6 defects", "0/4 sound"). Derived from that
+    # file rather than hardcoded, so if the reviewer's corpus is ever extended
+    # the expectation follows it.
+    heldout = os.path.join(ROOT, "evaluation", "heldout", "run_heldout.py")
+    if os.path.exists(heldout):
+        with open(heldout, encoding="utf-8") as fh:
+            heldout_src = fh.read()
+        h_broken = len(re.findall(r"\n\s*True,\s*\n?\s*[\"']", heldout_src))
+        h_sound = len(re.findall(r"\n\s*False,\s*\n?\s*[\"']", heldout_src))
+        if h_broken:
+            valid_denominators |= {h_broken, h_sound, h_broken + h_sound}
     watch = {
         f"{n}/{d}"
         for d in range(1, 20) if d not in valid_denominators
@@ -431,6 +455,77 @@ def main() -> int:
             os.path.exists(path),
             f"{path} is missing, so that changelog row rests on nothing",
         )
+
+    # ---------------------------------------- claims living outside the prose
+    # manifest.json: a note may not assert that a configuration reaches an
+    # environment that every committed result reports as missed.
+    with open(os.path.join(ROOT, "corpus", "manifest.json"), encoding="utf-8") as fh:
+        manifest_raw = json.load(fh)
+    all_results = load_all()
+    overclaimed = []
+    for task in manifest_raw["tasks"]:
+        note = task.get("notes", "")
+        if not re.search(r"reachable only by|only the model|only reachable", note, re.I):
+            continue
+        detected_by = [
+            v for v, payload in all_results.items()
+            if any(r["task_id"] == task["id"] and r["flagged"] for r in payload["rows"])
+        ]
+        if not detected_by:
+            overclaimed.append(task["id"])
+    check(
+        "corpus/manifest.json claims no reachability the results contradict",
+        not overclaimed,
+        f"{overclaimed} are described as reachable by some configuration, but no "
+        f"committed result flags them. A note in the answer key is a claim.",
+    )
+
+    # report.html: the human-facing artifact must carry the headline correction,
+    # not the retracted comparison. It led with 0.61 against 0.94 for three
+    # review rounds after the README had retracted exactly that framing.
+    html_path = os.path.join(ROOT, "evaluation", "report.html")
+    if os.path.exists(html_path):
+        with open(html_path, encoding="utf-8") as fh:
+            html = fh.read()
+        best_readonly = max(
+            (p for v, p in all_results.items() if v.startswith("v0")),
+            key=lambda p: p["metrics"]["balanced_accuracy"],
+        )
+        needed = f"{best_readonly['metrics']['balanced_accuracy']:.2f}"
+        check(
+            "evaluation/report.html carries the headline correction",
+            needed in html,
+            f"report.html does not mention {needed}, the strongest read-only "
+            f"result. The artifact a judge opens must not lead with a comparison "
+            f"the README retracts. Rebuild with: ./run.sh report",
+        )
+
+    # --------------------------------------------- this script's own check count
+    # The count is quoted in VERIFY.md and REPRODUCTION.md, and it has now gone
+    # stale twice while this very file was growing (24 while it ran 27, then 27
+    # while it ran 30). A stale number in the file whose purpose is preventing
+    # stale numbers is the most embarrassing defect available here, so the count
+    # checks itself. +1 accounts for this check, which has not run yet.
+    total_checks = checks + 1
+    stale_counts = []
+    for name in DOCS:
+        text = read(name)
+        # Scoped to lines that are actually about this script. An unscoped version
+        # matched "sandbox self-test: PASS (22 checks)" and demanded it equal the
+        # documentation-check count, which is a different number for a different
+        # thing.
+        for line in text.splitlines():
+            if not re.search(r"check_docs|documentation matches the evidence", line):
+                continue
+            for match in re.finditer(r"\((\d+) checks\)|(\d+) checks", line):
+                stated = int(match.group(1) or match.group(2))
+                if stated != total_checks:
+                    stale_counts.append((name, stated))
+    check(
+        f"documents state the right number of checks ({total_checks})",
+        not stale_counts,
+        f"found {stale_counts}; this script runs {total_checks} checks",
+    )
 
     print()
     print("=" * 78)

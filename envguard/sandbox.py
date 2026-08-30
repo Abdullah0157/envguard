@@ -145,6 +145,40 @@ def _terminate_group(proc: subprocess.Popen) -> None:
         pass
 
 
+# Workdirs are prefixed per PROCESS, not just per project.
+#
+# The leak check below used to glob the shared temp dir for "envguard_*", which
+# counts directories belonging to ANY concurrent run. Two independent reviewers
+# hit this: one had other sessions auditing the same repo, the other ran the
+# suite while something else was in flight, and both saw `sandbox self-test:
+# 1 FAILURE(S)` on the first command this project tells a judge to run. Neither
+# failure was real. A shared-namespace check cannot tell a leak from a neighbour,
+# so it must not be asked to.
+WORKDIR_PREFIX = f"envguard_{os.getpid()}_"
+
+# Only directories this process created are ever considered leaked.
+_CREATED_WORKDIRS: set[str] = set()
+
+
+def _remove_workdir(workdir: str, attempts: int = 5) -> None:
+    """Delete a workdir, tolerating a process group that is still dying.
+
+    On the timeout path the child's group is killed and reaped, but a
+    grandchild can still hold a file open for a few milliseconds while rmtree
+    walks the tree. A single ignore_errors=True pass silently leaves the
+    directory behind, which then reads as a leak. Retrying briefly closes the
+    race; the final pass still ignores errors so cleanup can never raise into a
+    caller that is holding a legitimate result.
+    """
+    for attempt in range(attempts):
+        shutil.rmtree(workdir, ignore_errors=(attempt == attempts - 1))
+        if not os.path.exists(workdir):
+            break
+        time.sleep(0.05 * (attempt + 1))
+    if not os.path.exists(workdir):
+        _CREATED_WORKDIRS.discard(workdir)
+
+
 def run_candidate(
     verifier_src: str,
     solution_src: str,
@@ -162,7 +196,8 @@ def run_candidate(
     Never raises for ordinary child misbehaviour. Callers can treat any
     RunResult as trustworthy evidence of what actually happened.
     """
-    workdir = tempfile.mkdtemp(prefix="envguard_")
+    workdir = tempfile.mkdtemp(prefix=WORKDIR_PREFIX)
+    _CREATED_WORKDIRS.add(workdir)
     started = time.monotonic()
     try:
         files = {
@@ -232,7 +267,7 @@ def run_candidate(
             truncated=trunc_out or trunc_err,
         )
     finally:
-        shutil.rmtree(workdir, ignore_errors=True)
+        _remove_workdir(workdir)
 
 
 # --------------------------------------------------------------------------
@@ -396,7 +431,9 @@ def _self_test() -> int:
         print(f"  [{'ok' if ok else 'FAIL'}] canary does NOT fire on honest code: {label}")
 
     # Cleanup check: no temp directories left behind.
-    leaked = [p for p in os.listdir(tempfile.gettempdir()) if p.startswith("envguard_")]
+    # Scoped to this process. A concurrent audit's in-flight workdir is not a leak
+    # of ours, and treating it as one made this self-test fail for two reviewers.
+    leaked = [p for p in _CREATED_WORKDIRS if os.path.exists(p)]
     ok = not leaked
     failures += 0 if ok else 1
     print(f"  [{'ok' if ok else 'FAIL'}] no temp dirs leaked ({len(leaked)} found)")

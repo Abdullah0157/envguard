@@ -126,7 +126,7 @@ Expected final lines:
 ```
 sandbox self-test: PASS
 RESULT: PASS - answer key is sound
-RESULT: PASS - documentation matches the evidence (24 checks)
+RESULT: PASS - documentation matches the evidence (33 checks)
 llm self-test: PASS
 ```
 
@@ -180,6 +180,12 @@ python3 evaluation/make_report.py --write
 `python3 evaluation/run_eval.py --list` prints the configurations.
 
 ## 7. Approximate runtimes
+
+> **These are idle-machine numbers and they are the least reproducible thing in
+> this repository.** A reviewer measured `v3` at 28 to 33 seconds against the ~7
+> below, and `check_corpus.py` at 76 seconds against ~25, on comparable hardware
+> under load. Every verdict they got was identical to the committed one. Treat
+> the table below as a lower bound, not a promise.
 
 Measured on an Apple M1, 16 GB, `qwen3:4b`. Model-backed stages are slower on
 `qwen3:8b`, which swaps on a 16 GB machine.
@@ -302,3 +308,12 @@ you want to check the evidence without altering it. The optional model
 stages are reproducible in distribution rather than exactly, because local
 inference varies with hardware and Ollama version; this is stated in section 8
 and is why the headline result is drawn from the deterministic path.
+
+> **An external reviewer re-ran `v0` against their own local Ollama and got all
+> 15 verdicts identical to the committed file**, including the exact miss list
+> and the two it finds. So on this corpus the model-backed path reproduced
+> exactly, not merely in distribution. That is a stronger result than the claim
+> above, and the claim is deliberately left as the weaker one: one matching
+> re-run on similar hardware does not establish determinism across machines,
+> Ollama versions or quantisations. Reported because it is evidence the
+> self-reported baseline was not cherry-picked from a bad run.

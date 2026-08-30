@@ -329,9 +329,68 @@ the last round is the one that changed a headline number.
 
 ---
 
+## Checkpoint 9: four judges at once, and the sentences lost to the numbers
+
+Four independent reviewers scored the same commit: 94, 88, 95 and 89. The spread
+is itself informative, and so is what they agreed on.
+
+**The pattern across all four.** I had been fixing numbers and leaving sentences.
+Every figure in the repository was correct and mechanically guarded, and four
+separate prose claims were now **refuted by the repository's own committed
+files**:
+
+| Claim | Refuted by |
+|---|---|
+| "It saw the hole and did not walk through it, because it never had to run anything" | `v0-reason-first.json`, which walks through it, 9 of 9 |
+| "The only way to observe that is to run the correct answer" (D8) | `v0-hardened.json`'s t08 reason, which observes it exactly, by arithmetic |
+| "the same structured output contract" | `v0-reason-first.json`: same contract, different field order, 0.61 to 0.50 |
+| "There are three, all of them favour envguard" | the table below it, which I had grown to four |
+
+The D8 one is the most instructive. A reviewer read my own result file and found
+the hardened baseline saying *"the verifier's expected value is wrong (it should
+be 7, not 8) ... broken at the root"*, with `flagged: false`. The reader had
+identified the defect precisely and the harness scored it a miss. **The verdict
+schema could not express "broken at the root"**, because it asks one boolean
+question and a D8 environment is broken in the opposite direction. That is a
+defect in my instrument recorded as a limitation of the reader, and it is the
+same root cause as the schema-ordering finding: the output contract, not the
+reasoning, determined the score.
+
+**Two artifacts were outside the guard, and that is exactly where findings
+survived.** `check_docs.py` had grown to 30 checks over `README.md`,
+`REPRODUCTION.md` and `VERIFY.md`. Two findings survived a revision aimed
+specifically at this class because they lived elsewhere: `corpus/manifest.json`
+claimed t15 was "reachable only by the model" when no configuration reaches it,
+and `evaluation/report.html` led with the retracted 0.61 headline for three
+consecutive rounds. Both are now inside the perimeter. A claim is a claim
+whatever file it is in.
+
+**The self-test was failing for two reviewers and I could not reproduce it.**
+`sandbox.py` globbed the shared temp directory for `envguard_*`, so any
+concurrent run counted as a leak. One reviewer diagnosed it and retracted their
+own finding; another hit it independently, 3 of 6 runs, and reported it as real.
+Both were right: the failures were not real leaks, and the check was genuinely
+broken. Reproduced in one line by creating a single foreign `envguard_` directory,
+then fixed by scoping workdirs per process and retrying cleanup around a
+still-dying process group.
+
+**And one reviewer answered a question I had raised against myself and not
+tested.** Limitation 1 says I wrote the corpus, the taxonomy and the attacks, so
+the score may measure that overlap. They wrote ten environments I had never seen
+and ran the shipped `v3` on them: **5 of 6 defects, 0 false alarms on 4 sound,
+balanced accuracy 0.92 against 0.94 on my own corpus**. The single miss
+reproduced my already-disclosed blind spot rather than finding a new one. That
+corpus is now committed under `evaluation/heldout/` with its provenance, and it
+is the strongest evidence in the project because its author was trying to break
+it.
+
+**Reproduce this:** `python3 evaluation/heldout/run_heldout.py`.
+
+---
+
 ## What this trajectory shows about working with a coding agent
 
-Every one of the eight checkpoints is the same shape: **the agent produced
+Every one of the nine checkpoints is the same shape: **the agent produced
 something confident and plausible, and a tool response or a committed artefact
 contradicted it.** The sandbox said a program that ran nothing had passed. The
 validator said the taxonomy was wrong. The differential tester said the exploit

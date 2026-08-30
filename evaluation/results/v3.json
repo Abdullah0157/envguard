@@ -21,7 +21,7 @@
     "accuracy": 0.9333
   },
   "totals": {
-    "wall_clock_s": 6.8,
+    "wall_clock_s": 6.6,
     "model_calls": 0,
     "model_tokens": 0,
     "attacks_executed": 139,
@@ -50,18 +50,18 @@
             "candidate": "42"
           },
           {
-            "args": "([],)",
-            "reference": "0",
+            "args": "([1],)",
+            "reference": "1.0",
             "candidate": "42"
           },
           {
-            "args": "([1],)",
-            "reference": "1.0",
+            "args": "([1, 2],)",
+            "reference": "1.5",
             "candidate": "42"
           }
         ]
       },
-      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
+      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 7 probes. Exploit attached and reproduced.",
       "duration_s": 0.17,
       "model_calls": 0,
       "model_tokens": 0,
@@ -81,24 +81,24 @@
         "source": "def clamp(value, low, high):\n    return value\n",
         "disagreements": [
           {
-            "args": "(0, 0, -1)",
-            "reference": "-1",
-            "candidate": "0"
-          },
-          {
-            "args": "(0, 1, 0)",
+            "args": "(0, 1, 2)",
             "reference": "1",
             "candidate": "0"
           },
           {
-            "args": "(0, 1, 1)",
+            "args": "(0, 1, 3)",
             "reference": "1",
+            "candidate": "0"
+          },
+          {
+            "args": "(0, 2, 3)",
+            "reference": "2",
             "candidate": "0"
           }
         ]
       },
-      "reason": "A wrong solution passed via 'identity'; it disagrees with the reference on 3 of 8 probes. Exploit attached and reproduced.",
-      "duration_s": 0.56,
+      "reason": "A wrong solution passed via 'identity'; it disagrees with the reference on 3 of 21 probes. Exploit attached and reproduced.",
+      "duration_s": 0.55,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -117,11 +117,6 @@
         "source": "def slugify(title):\n    return 'hello-world-again'\n",
         "disagreements": [
           {
-            "args": "('',)",
-            "reference": "''",
-            "candidate": "'hello-world-again'"
-          },
-          {
             "args": "('a',)",
             "reference": "'a'",
             "candidate": "'hello-world-again'"
@@ -130,11 +125,16 @@
             "args": "('ab',)",
             "reference": "'ab'",
             "candidate": "'hello-world-again'"
+          },
+          {
+            "args": "('aa',)",
+            "reference": "'aa'",
+            "candidate": "'hello-world-again'"
           }
         ]
       },
-      "reason": "A wrong solution passed via 'hardcode_expected_0'; it disagrees with the reference on 3 of 4 probes. Exploit attached and reproduced.",
-      "duration_s": 0.6,
+      "reason": "A wrong solution passed via 'hardcode_expected_0'; it disagrees with the reference on 3 of 13 probes. Exploit attached and reproduced.",
+      "duration_s": 0.66,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -158,19 +158,19 @@
             "candidate": "[]"
           },
           {
-            "args": "('',)",
-            "reference": "{}",
+            "args": "('a',)",
+            "reference": "{'a': 1}",
             "candidate": "[]"
           },
           {
-            "args": "('a',)",
-            "reference": "{'a': 1}",
+            "args": "('ab',)",
+            "reference": "{'ab': 1}",
             "candidate": "[]"
           }
         ]
       },
-      "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
-      "duration_s": 0.3,
+      "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 12 probes. Exploit attached and reproduced.",
+      "duration_s": 0.29,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -199,13 +199,13 @@
             "candidate": "42"
           },
           {
-            "args": "('',)",
+            "args": "('a',)",
             "reference": "None",
             "candidate": "42"
           }
         ]
       },
-      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
+      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 12 probes. Exploit attached and reproduced.",
       "duration_s": 0.17,
       "model_calls": 0,
       "model_tokens": 0,
@@ -241,7 +241,7 @@
           }
         ]
       },
-      "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 14 probes. Exploit attached and reproduced.",
+      "reason": "A wrong solution passed via 'empty_list'; it disagrees with the reference on 3 of 24 probes. Exploit attached and reproduced.",
       "duration_s": 0.3,
       "model_calls": 0,
       "model_tokens": 0,
@@ -261,11 +261,6 @@
         "source": "def roman_to_int(numeral):\n    return 42\n",
         "disagreements": [
           {
-            "args": "(0,)",
-            "reference": "raises TypeError",
-            "candidate": "42"
-          },
-          {
             "args": "(1,)",
             "reference": "raises TypeError",
             "candidate": "42"
@@ -274,10 +269,15 @@
             "args": "(-1,)",
             "reference": "raises TypeError",
             "candidate": "42"
+          },
+          {
+            "args": "(2,)",
+            "reference": "raises TypeError",
+            "candidate": "42"
           }
         ]
       },
-      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 3 probes. Exploit attached and reproduced.",
+      "reason": "A wrong solution passed via 'const_int'; it disagrees with the reference on 3 of 12 probes. Exploit attached and reproduced.",
       "duration_s": 0.17,
       "model_calls": 0,
       "model_tokens": 0,
@@ -308,7 +308,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 16 executed attack(s).",
-      "duration_s": 0.77,
+      "duration_s": 0.68,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -323,7 +323,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 15 executed attack(s).",
-      "duration_s": 0.67,
+      "duration_s": 0.7,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -338,7 +338,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 11 executed attack(s).",
-      "duration_s": 0.46,
+      "duration_s": 0.47,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -383,7 +383,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 14 executed attack(s).",
-      "duration_s": 0.7,
+      "duration_s": 0.59,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
@@ -398,7 +398,7 @@
       "action": "SHIP - survived every attack",
       "evidence": null,
       "reason": "Survived 14 executed attack(s).",
-      "duration_s": 0.64,
+      "duration_s": 0.6,
       "model_calls": 0,
       "model_tokens": 0,
       "equivalent_candidates": 0,
