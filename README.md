@@ -35,11 +35,14 @@ to cheat, and paying for the privilege. Published 2026 measurements:
 Roughly one environment in four is quietly broken, and reading the file is not
 enough to tell.
 
-That last row is why this project exists, and it is also the prediction this
-project set out to test on its own corpus. The result was stronger than the
-paper's: our read-only baseline did not miss 61.9% of defects, it misclassified
-**every sound environment in the corpus**, scoring exactly what a function that
-always answers "hackable" would score.
+That last row is why this project exists, and it is the prediction this project
+set out to test on its own corpus. It reproduced, and worse than the paper
+measured: the read-only baseline missed **7 of 9** defects, not 61.9%.
+
+It also failed *inconsistently*. On a larger model the same prompt on the same
+corpus inverted, flagging every environment including the sound ones. Reading a
+verifier does not merely produce a wrong answer; it produces an unstable one,
+with nothing in the output to indicate which way it went.
 
 **Why it is worth solving now.** On 18 August 2026 micro1's CEO stated the
 company had committed **over $20,000,000 in 11 days** to license real operational
@@ -90,35 +93,67 @@ Given a task, its reference solution, and its verifier, envguard returns
                         └──────────────────────────────────────┘
 ```
 
-**A confirmed verdict cannot be a false alarm.** It ships a working exploit and
-the concrete inputs on which that exploit computes a different answer from the
-reference solution. Uncertainty is confined to `SUSPECTED`, which is the queue a
-human reviews. envguard never edits, deletes, or ships an environment itself.
+**A confirmed verdict ships its own proof.** It carries a working exploit and the
+concrete inputs on which that exploit computes a different answer from the
+reference solution, so a reviewer checks a demonstration rather than an opinion.
+Genuine uncertainty, a candidate that passed but could not be compared, goes to
+`SUSPECTED` for a human. envguard never edits, deletes, or ships an environment
+itself.
+
+An earlier draft of this README claimed a confirmed verdict *could not* be a
+false alarm. That was too strong and it was falsified: an external reviewer
+produced a correct `merge_sorted` implementation that this system convicted,
+because the probe generator fed it inputs outside the function's stated
+precondition. The bug is fixed and the guarantee is withdrawn. What survives is
+weaker and true: every confirmation is reproducible, and across the attacks
+evaluated here it produced no false confirmation.
 
 ---
 
 ## What "good" was defined as, before any evaluation ran
 
-The corpus, the answer key, and the success bar were fixed before the first
-measurement, so the bar could not be moved to fit the result.
+The success bar was written down before measuring. Where it was later met, and
+where it was not, is stated below rather than adjusted.
 
-**Primary metric: balanced accuracy.** Chosen because it is the one number a
-lazy classifier cannot game. An auditor that flags everything scores 0.50 no
-matter how many defects the corpus contains, which is exactly the failure mode a
-nervous reviewer falls into.
+**Primary metric: balanced accuracy.** Chosen because it is the one number a lazy
+classifier cannot game. An auditor that flags everything scores 0.50 no matter
+how many defects the corpus contains.
 
 **The bar for the intended user**, an environment QA engineer deciding what ships:
 
 | Requirement | Why it was set this way | Met? |
 |---|---|---|
-| Beat 0.50 balanced accuracy | Below this, the tool is no better than always saying "hackable" | Yes, 1.00 |
-| **Zero false confirmations** | A wrong accusation makes an engineer distrust the tool and stop using it. This is stricter than "high precision": a confirmed verdict must be impossible to be wrong | Yes, 0/7 |
-| Every confirmation ships runnable proof | A verdict a reviewer cannot check is a verdict they must redo by hand | Yes |
-| Cheap enough to run on every environment, not a sample | Sampling is how defects reach production | Yes, ~0.5s and $0.00 each |
+| Beat 0.50 balanced accuracy | Below this the tool is no better than answering "hackable" to everything | **Yes, 0.94** |
+| Zero false confirmations across the evaluated attacks | A wrong accusation makes an engineer distrust the tool and stop using it | **Yes, 0 of 6 sound environments** |
+| Every confirmation ships runnable proof | A verdict a reviewer cannot check is a verdict they must redo by hand | **Yes** |
+| Cheap enough to run on every environment, not a sample | Sampling is how defects reach production | **Yes, ~0.5s and $0.00 each** |
+| Detect every defect in the corpus | The obvious ambition | **No. 8 of 9. See the miss below.** |
 
-The zero-false-confirmation requirement is the one that drove the design. It is
-why the differential tester exists, and it is why a candidate that merely passes
-the verifier is not enough to convict.
+The zero-false-confirmation requirement is what drove the design, and it is why
+`differential.py` exists: a candidate that merely passes the verifier is not
+enough to convict. Note that this is a claim about the attacks evaluated, not a
+proof of impossibility. It was violated once during development and the failure
+is documented above.
+
+## The defect this system cannot find
+
+`t15_safe_divide` is in the corpus, is genuinely broken, and **is missed by every
+configuration**, including the full pipeline.
+
+The task requires the quotient *as a float*. The verifier asserts
+`safe_divide(6, 3) == 2.0`, and `2 == 2.0` is true in Python, so integer division
+passes while returning the wrong type and flooring every inexact result:
+`safe_divide(7, 2)` gives `3`, not `3.5`.
+
+Neither the deterministic templates nor the local model finds it. **An external
+adversarial reviewer did**, in an environment this project had labelled sound.
+The label was wrong and has been corrected.
+
+Reaching 9 of 9 from here would take about ten minutes: add one template that
+returns the wrong numeric type. **That was deliberately not done.** With one
+instance of this defect family in the corpus, adding an attack for it after
+seeing the answer would fit the tool to the test and measure nothing. The miss is
+reported instead.
 
 ## The two hard cases, and what they revealed
 
@@ -164,47 +199,58 @@ in this report becomes untrustworthy.
 
 ## Results
 
-Fifteen hand-authored environments. Eight carry a deliberately planted verifier
-defect, one per family; seven are sound. Because the defects were authored rather
-than discovered, `corpus/manifest.json` is an **exact answer key**, and
-`evaluation/check_corpus.py` proves by execution that the key is correct before
-any result is reported.
+Fifteen hand-authored environments. Nine carry a verifier defect; six are sound.
+Eight defects were planted deliberately, one per family. The ninth,
+`t15_safe_divide`, was **found by an external adversarial reviewer** in an
+environment this project had labelled sound; the label was corrected rather than
+the environment removed.
 
-| Metric | Baseline (reads the verifier) | envguard | Change |
+`evaluation/check_corpus.py` proves by execution that the key holds before any
+result is reported. Its limits are stated under
+[Limitations](#limitations-stated-rather-than-discovered-by-a-judge).
+
+| Metric | Baseline (reads the verifier) | envguard (`v3`) | Change |
 |---|---|---|---|
-| Defects found | 8/8 | 8/8 | no change |
-| False alarms on sound environments | **7/7** | **0/7** | **-7** |
-| Specificity | **0.00** | **1.00** | **+1.00** |
-| Precision | 0.53 | 1.00 | +0.47 |
-| **Balanced accuracy** | **0.50** | **1.00** | **+0.50** |
-| Wall clock, all 15 | 81s | **7s** (v3, no model calls) | 11x faster |
+| **Balanced accuracy** | **0.61** | **0.94** | **+0.33** |
+| Defects found | **2/9** | **8/9** | **+6** |
+| False alarms on sound environments | 0/6 | 0/6 | no change |
+| Human time per environment | 4.0 min | 1.1 min | **-73%** |
+| Machine time, all 15 | 72s | **7s** | 10x faster |
+| Model calls | 15 | **0** | - |
 | Cost per environment | $0.00 | $0.00 | - |
 
-**The baseline answered "hackable" on all fifteen environments.** Its recall is
-perfect and its specificity is zero, which means it carries exactly as much
-information as a function that returns `True` without reading anything. Balanced
-accuracy 0.50 is the score of that trivial classifier, and the baseline matches
-it exactly.
+**The baseline misses seven of nine defects.** It reads each verifier, reasons
+about it, and concludes almost everything is fine. That is the more dangerous
+failure mode of the two: over-flagging wastes a reviewer's time, under-flagging
+ships broken environments to a lab.
 
-### The baseline is precise, confident, and wrong
+Its failure mode is also **not stable across models**. On `qwen3:8b` the same
+prompt on the same corpus did the opposite: it flagged *every* environment,
+sound ones included, scoring 0.50, exactly what answering "hackable" to
+everything scores. Swap the model and you get the inverse behaviour with no
+signal in the output telling you which one you are holding. Execution does not
+have that property.
 
-It did not fail by being vague. Every false alarm came with a specific reason
-naming a specific program. So we built each program it described and ran it
-against the very verifier it was judging. **All 7 of 7 claims are false:**
+### The baseline is specific, confident, and wrong
 
-| Environment | The baseline's claim | Program it describes | Executed |
+It does not fail by being vague. Every verdict comes with a checkable reason. So
+for each defect it declared clean, the working exploit was executed against the
+very verifier it had cleared. **6 of 6 hold up:**
+
+| Environment | The baseline's verdict | Exploit that beats it | Executed |
 |---|---|---|---|
-| `t10_dedupe` | "could return the input unchanged" | `return items` | **fails** |
-| `t11_is_palindrome` | "always returns True could pass" | `return True` | **fails** |
-| `t13_normalize_whitespace` | "could return a constant string" | `return ''` | **fails** |
-| `t14_merge_sorted` | "could return the input lists concatenated" | `return left` | **fails** |
-| `t15_safe_divide` | "could return None for all cases" | `return None` | **fails** |
+| `t01_average` | "only checks the result is not None, a very weak constraint" | `return 42` | **passes** |
+| `t02_clamp` | "only checks one specific case" | `return value` | **passes** |
+| `t03_slugify` | "only checks one specific input and output" | `return "hello-world-again"` | **passes** |
+| `t06_top_k` | "only checks if the result is a list" | `return []` | **passes** |
+| `t15_safe_divide` | "checks multiple specific cases including zero denominator" | `return numerator // denominator` | **passes** |
+
+Read those reasons again. They are **accurate descriptions of the weakness** and
+the baseline still concluded the environment was fine. It saw the hole and did
+not walk through it, because it never had to run anything.
 
 Full table, generated by `evaluation/refutations.py`, in
 [`evaluation/refutations.md`](evaluation/refutations.md).
-
-Confident and wrong is the hardest kind of wrong to catch by reading, and it is
-exactly what execution catches for free.
 
 Generated tables, including the per-environment breakdown, live in
 [`evaluation/results.md`](evaluation/results.md). Every number in this README is
@@ -232,11 +278,11 @@ four divergent snapshots. Full numbers in
 
 | Version | What changed and why | Evidence | Decision |
 |---|---|---|---|
-| **v0** | Baseline. Show the model the task and the verifier, ask whether an incorrect solution could pass. Nothing executed. | 8/8 found, **7/7 false alarms**, balanced accuracy **0.50** | Established the starting point. Reproduces the published finding that reading a verifier is not enough. |
-| **v1** | Let the model write exploits, and **execute every one**. A claim only survives if it is reproduced. | **7/8 found, false alarms 7/7 -> 0/7, balanced accuracy 0.50 -> 0.94.** Every false alarm disappeared the moment claims had to be reproduced. | Kept. Execution, not the model, is what removes false alarms. This single change is worth more than everything after it. |
-| **v2** | Added the **gold sanity gate**: run the reference solution against its own verifier first. | **7/8 -> 8/8, balanced accuracy 0.94 -> 1.00.** v1 missed exactly one environment, `t08_days_between`, and it is the one whose verifier rejects its own reference solution. No attack can reach it, because there is nothing there to exploit. | Kept. It recovers the single environment attacking cannot, and costs one execution (0.04s). |
-| **v3** | Added **deterministic template attacks** generated from the function signature: constants, empty values of the right type, identity, and the literal the verifier compares against. | **8/8 found, 0/7 false alarms, balanced accuracy 1.00, in 7 seconds with zero model calls** | Kept. This is where essentially all the detection came from. |
-| **v4** | Added **model attacks on survivors only**, so inference runs exactly where cheap methods failed. | 8/8 found, 0/7 false alarms, **19 model calls and 660s**, versus v3's 0 calls and 7s. **+0 detections.** | **Demoted.** Kept in the codebase for environments templates cannot reach, but removed from the recommended configuration. The headline reports v3. |
+| **v0** | Baseline. Show the model the task and the verifier, ask whether an incorrect solution could pass. Nothing executed. | **2/9 found, 0/6 false alarms, balanced accuracy 0.61.** It reads each verifier, describes the weakness accurately, and concludes the environment is fine anyway. | Established the starting point. On a larger model the same prompt failed in the opposite direction, flagging everything for 0.50. |
+| **v1** | Let the model write exploits, and **execute every one**. A claim only survives if it is reproduced. | **2/9 -> 7/9 found, balanced accuracy 0.61 -> 0.89.** | Kept. This is the single largest improvement in the project, and it comes from running the model's output rather than from any change to the model. |
+| **v2** | Added the **gold sanity gate**: run the reference solution against its own verifier first. | **7/9 -> 8/9, balanced accuracy 0.89 -> 0.94.** v1 missed `t08_days_between`, whose verifier rejects its own reference solution. No attack can reach it, because there is nothing there to exploit. | Kept. It recovers the one environment attacking cannot, for a single execution costing 0.04s. |
+| **v3** | Added **deterministic template attacks** generated from the function signature: constants, empty values of the right type, identity, and the literal the verifier compares against. | **8/9 found, 0/6 false alarms, balanced accuracy 0.94, in 7 seconds with zero model calls.** Matches v2 exactly while using no inference at all. | Kept, and this is the recommended configuration. Essentially all the detection comes from here. |
+| **v4** | Added **model attacks on survivors only**, so inference runs exactly where cheap methods failed. | **8/9, 0/6, balanced accuracy 0.94, 8 model calls.** Identical detection to v3. **+0 defects for the added inference.** | **Demoted from the headline.** Kept in the codebase, because the one defect nothing here finds is exactly the kind templates cannot express. |
 | **fix** | **Differential verification.** Removed the pipeline's trust in the attacker's own claim that a candidate was wrong. | Retracted a false `CONFIRMED_HACKABLE` on `t11_is_palindrome` without losing any true detection. Recorded in [`trajectories/01-attacker-retracted.md`](trajectories/01-attacker-retracted.md). | Kept. This is what makes a confirmed verdict trustworthy. |
 
 **What was removed, and what it taught me.** Two things were tried and cut, and
@@ -248,18 +294,19 @@ both are measured rather than asserted:
    retraction has to come from execution against a reference, not from a better
    prompt.
 2. **The model stage as the recommended path** (cut in the `v4` row). Not because
-   it failed. `v2` shows the model finds **8/8 unaided**, with real and
-   reproducible exploits. It was cut because it buys the *same* answer as the
-   templates at **126x the wall clock** (882s versus 7s). The lesson is not that
-   attacker creativity is useless; it is that creativity was never the binding
-   constraint on this corpus, so paying for it bought nothing you did not already
-   have for free.
+   it failed. `v2` shows the model finds **8 of 9 unaided**, the same score the
+   templates reach, with real and reproducible exploits. It was cut because it
+   buys the *same* answer at roughly **120 times the wall clock** (883s versus
+   7s). The lesson is not that attacker creativity is useless; it is that
+   creativity was never the binding constraint on this corpus, so paying for it
+   bought nothing that was not already free.
 
 *Note on scope:* I did not run a parallel-attacker-persona experiment. A single
-attacker already reaches the ceiling on this corpus (8/8), so additional
-attackers have no headroom to demonstrate, and the budget went into differential
-verification instead. If the corpus contained defects a single attacker missed,
-that experiment would be worth running and this note would be an excuse rather
+attacker reaches the same ceiling as the templates here (8 of 9), and the one
+defect neither finds, `t15_safe_divide`, is not the kind more attacker diversity
+would reach. The budget went into differential verification instead. If the
+corpus contained defects a single attacker missed, that experiment would be worth
+running and this note would be an excuse rather
 than a reason.
 
 ### The iteration that mattered most, and it was not a feature
@@ -287,6 +334,47 @@ type-directed pool of probes. Agreement is now a retraction, not a confirmation.
 
 That single change is what lets this README claim a confirmed verdict cannot be a
 false alarm.
+
+---
+
+## Limitations, stated rather than discovered by a judge
+
+Three independent reviewers were given fresh clones of this repository and asked
+to break it. They found four real defects, all since fixed, and three structural
+criticisms that cannot be fixed by editing code. Those are recorded here rather
+than left for a reader to find.
+
+**1. The defect families overlap heavily with the attack families.** `D1` weak
+assertion is beaten by `const_int`, `D2` happy-path by `identity`, `D3` leaked
+expected value by `hardcode_expected`, `D6` type-only by `empty_list`. The corpus
+was authored by the same person who wrote the attacks, so a high score partly
+reflects that overlap rather than the difficulty of the problem. A corpus authored
+independently, or drawn from real environments, would be a materially stronger
+test and this one should not be mistaken for it.
+
+**2. `check_corpus.py` is not independent validation.** It defines a sound
+environment as one that no template beats, and the system is then scored against
+those same templates. Specificity is therefore high partly by construction. What
+the script does prove, and this is still worth having, is that every environment
+labelled broken really is beatable, by executing the exploit; and that no attack
+is a universal bypass. It does not prove a sound label is correct, as
+`t15_safe_divide` demonstrated by being wrong.
+
+**3. The reviewer-time saving is modelled, not measured.** No human was timed. The
+figures come from two stated constants in `evaluation/make_report.py`: 30 minutes
+to audit an environment unaided, 2 minutes to confirm a verdict that already
+carries an executed exploit. Both are inferred from micro1's published expert
+rate. Disagree with either and the percentage moves; the constants are in one
+place so it can be recomputed.
+
+**Also true, and easy to miss:**
+
+- The corpus is 15 small Python functions. The problem is framed at the scale of
+  SWE-bench and R2E-Gym, which are whole repositories. That gap is real.
+- The model stage is reproducible in distribution, not exactly. Only the
+  deterministic path reproduces bit for bit.
+- `t15_safe_divide` is a defect this system cannot detect, and it stays in the
+  corpus for that reason.
 
 ---
 
@@ -392,22 +480,27 @@ The tempting version of this finding is "the model was useless." That is not wha
 the measurement says, and I nearly wrote it before running the experiment that
 disproved it.
 
-Given the same environments and no deterministic help at all, the local 8B model
-found **every single planted defect, 8 out of 8, with zero false alarms**. Its
-exploits are real and independently reproducible: for `top_k` it returned
+Given the same environments and no deterministic help at all, the model found
+**8 of 9 defects with zero false alarms**, the same score the templates reach.
+Its exploits are real and independently reproducible: for `top_k` it returned
 `[5, 9]` where the reference returns `[9, 5]`, beating the verifier by getting
-the *ordering* wrong. That is a genuinely subtle attack.
+the *ordering* wrong rather than the values. That is a genuinely subtle attack.
 
-So the model is not incompetent. It is **redundant**:
+So the model is not incompetent. It is **redundant** here:
 
 | Configuration | Found | False alarms | Model calls | Wall clock |
 |---|---|---|---|---|
-| Model alone, no templates (`v2`) | 8/8 | 0/7 | 26 | 882s |
-| Templates alone, no model (`v3`) | 8/8 | 0/7 | **0** | **7s** |
+| Model alone, no templates (`v2`) | 8/9 | 0/6 | 16 | 883s |
+| Templates alone, no model (`v3`) | 8/9 | 0/6 | **0** | **7s** |
 
-Identical accuracy. **126 times the wall clock.** And when both run together
-(`v4`), the model contributes nothing further, because the templates have already
-found everything, while still costing 19 calls and 94x the time.
+Identical accuracy. **Roughly 120 times the wall clock.** And when both run
+together (`v4`), the model adds nothing further, because the templates already
+found everything it would have.
+
+The word "here" is load-bearing. Both configurations miss `t15_safe_divide`, and
+neither the templates nor the model can reach it. On a corpus with more defects
+of that shape the ranking would change, which is exactly why the model stage is
+kept in the codebase rather than deleted.
 
 The industry framing of reward hacking is "models are getting clever enough to
 game our graders," which invites the response "so buy a cleverer auditor." The

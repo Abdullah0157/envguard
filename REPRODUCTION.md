@@ -44,7 +44,7 @@ pointing you at `--version v3` rather than a stack trace.
 
 ```bash
 ollama serve &            # skip if Ollama is already running
-ollama pull qwen3:8b      # about 5.2 GB, one time
+ollama pull qwen3:4b      # about 2.5 GB, one time. All committed results use this.
 ```
 
 Confirm it is reachable:
@@ -54,7 +54,9 @@ curl -s http://localhost:11434/api/tags | head -c 200
 ```
 
 To use a different model, set `ENVGUARD_MODEL`. `qwen3:4b` and `llama3.2:3b`
-were also measured; see the ablation in `README.md`.
+were also measured. `qwen3:4b` is the model all committed results use; `qwen3:8b`
+produces the same detection but inverts the baseline's failure mode, which is
+discussed in README.md under "The baseline is specific, confident, and wrong".
 
 ```bash
 export ENVGUARD_MODEL=qwen3:4b     # optional
@@ -134,19 +136,21 @@ python3 evaluation/make_report.py --write
 
 ## 7. Approximate runtimes
 
-Measured on an Apple M1, 16 GB, `qwen3:8b`.
+Measured on an Apple M1, 16 GB, `qwen3:4b`. Model-backed stages are slower on
+`qwen3:8b`, which swaps on a 16 GB machine.
 
 | Command | Runtime | Model calls |
 |---|---|---|
-| `sandbox.py` | ~7s | 0 |
-| `check_corpus.py` | ~17s | 0 |
+| `sandbox.py` | ~7s (22 checks) | 0 |
+| `check_corpus.py` | ~25s | 0 |
 | `run_eval.py --version v3` | **~7s** | **0** |
-| `run_eval.py --version v0` | ~80s | 15 |
-| `run_eval.py --version v4` | several minutes | tens |
-| `run_eval.py --version v1` | longest; the model runs on every environment | tens |
+| `run_eval.py --version v0` | ~4 min | 15 |
+| `run_eval.py --version v4` | ~15 min | 8 |
+| `run_eval.py --version v1` | ~15 min; the model runs on every environment | 18 |
 
 v3 is the one worth noticing: it audits all 15 environments in about seven
-seconds without invoking a language model at all.
+seconds without invoking a language model at all. Timings vary by machine; the
+committed result files record what this one measured.
 
 ## 8. Determinism
 
@@ -161,10 +165,13 @@ distribution.
 
 ## 9. What you should see
 
-- `v0` flags **every** environment as hackable, sound ones included, for a
-  balanced accuracy of 0.50, which is what an always-say-yes classifier scores.
-- `v3` reaches a perfect score on this corpus in about seven seconds with zero
+- `v0`, the read-only baseline, finds **2 of 9** defects for a balanced accuracy
+  of 0.61. It describes each weakness accurately and concludes the environment is
+  fine anyway.
+- `v3` finds **8 of 9** with **0 false alarms** in about seven seconds and zero
   model calls.
+- Both miss `t15_safe_divide`. That is expected and documented; it is a defect
+  this system cannot detect, kept in the corpus and reported rather than removed.
 - Any `CONFIRMED_HACKABLE` verdict includes the exploit source and the concrete
   inputs on which it disagrees with the reference solution. You can paste that
   exploit into the environment yourself and watch it pass.
