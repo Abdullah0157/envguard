@@ -126,7 +126,7 @@ Expected final lines:
 ```
 sandbox self-test: PASS
 RESULT: PASS - answer key is sound
-RESULT: PASS - documentation matches the evidence (33 checks)
+RESULT: PASS - documentation matches the evidence (34 checks)
 llm self-test: PASS
 ```
 
@@ -216,10 +216,10 @@ distribution.
 
 ## 9. What you should see
 
-- `v0`, the read-only baseline, finds **2 of 9** defects for a balanced accuracy
+- `v0`, the read-only baseline, finds **2 of 10** defects for a balanced accuracy
   of 0.60. It describes each weakness accurately and concludes the environment is
   fine anyway.
-- `v3` finds **8 of 9** with **0 false alarms** in about seven seconds and zero
+- `v3` finds **8 of 10** with **0 false alarms** in about seven seconds and zero
   model calls.
 - Both miss `t15_safe_divide`. That is expected and documented; it is a defect
   this system cannot detect, kept in the corpus and reported rather than removed.

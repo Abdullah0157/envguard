@@ -50,7 +50,7 @@ print("PASS")
 **Tool response:** `FAIL(exit=1)`
 
 ```
-  File "/private/var/folders/t_/v398l7_50qd70wsqmjqbflzw0000gn/T/envguard_15527_q2airnz1/verifier.py", line 7, in <module>
+  File "/private/var/folders/t_/v398l7_50qd70wsqmjqbflzw0000gn/T/envguard_24358_pism4qpp/verifier.py", line 7, in <module>
     assert days_between("2026-01-01", "2026-01-08") == expected
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 AssertionError

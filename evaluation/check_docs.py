@@ -115,6 +115,16 @@ def main() -> int:
     # "8/9" defects, "0/6" false alarms, "15/15" environments audited.
     valid_denominators = {broken, sound, total}
 
+    # The refutation table has its own denominator: the number of broken
+    # environments the baseline cleared, which is neither the broken count nor
+    # the sound count. Derived from the generated file so it follows the corpus.
+    _ref = os.path.join(ROOT, "evaluation", "refutations.md")
+    if os.path.exists(_ref):
+        with open(_ref, encoding="utf-8") as fh:
+            _n = len([ln for ln in fh if ln.strip().startswith("| `t") and "passes" in ln])
+        if _n:
+            valid_denominators.add(_n)
+
     # The externally-authored held-out corpus has its own shape, and the README
     # quotes rates against it ("5/6 defects", "0/4 sound"). Derived from that
     # file rather than hardcoded, so if the reviewer's corpus is ever extended
@@ -135,7 +145,30 @@ def main() -> int:
 
     for name in DOCS:
         text = read(name)
-        hits = sorted({w for w in watch if re.search(rf"(?<![\d/]){re.escape(w)}(?![\d/])", text)})
+        # Three spellings of the same claim, because two reviewers independently
+        # found that this check read only the slash form. "8 of 9" and "eight of
+        # nine" sailed past a guard built to stop exactly that claim, and six
+        # stale assertions were laundered through the gap. A guard with a blind
+        # spot in a project whose thesis is "a claim that is not executed is not
+        # evidence" is worse than no guard, because it certifies the thing it
+        # cannot see.
+        WORDS = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+                 "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+                 "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+                 "fifteen": 15}
+        normalised = text
+        # "eight of nine" -> "8/9"
+        for word, digit in WORDS.items():
+            normalised = re.sub(rf"\b{word}\b", str(digit), normalised, flags=re.I)
+        # "8 of 9" -> "8/9"
+        normalised = re.sub(r"(?<![\d/])(\d{1,3})\s+of\s+(\d{1,3})(?![\d/])",
+                            r"\1/\2", normalised)
+
+        hits = sorted({
+            w for w in watch
+            if re.search(rf"(?<![\d/]){re.escape(w)}(?![\d/])", text)
+            or re.search(rf"(?<![\d/]){re.escape(w)}(?![\d/])", normalised)
+        })
         # A doc may legitimately quote a historical figure, but only if it says so.
         # A document may quote a superseded rate while narrating the correction
         # that superseded it, but it has to say so. Two forms are accepted: the
@@ -526,6 +559,36 @@ def main() -> int:
             f"report.html does not mention {needed}, the strongest read-only "
             f"result. The artifact a judge opens must not lead with a comparison "
             f"the README retracts. Rebuild with: ./run.sh report",
+        )
+
+    # ------------------------------------- README's refutation table vs the generator
+    # refutations.md is generated and always correct; the README copy is
+    # transcribed and has now lost a row TWICE, both times while still asserting
+    # a count. The first instance is documented in the README itself as a fixed
+    # bug; relabelling t13 reintroduced it. Counting both sides ends the cycle.
+    ref_md = os.path.join(ROOT, "evaluation", "refutations.md")
+    if os.path.exists(ref_md):
+        with open(ref_md, encoding="utf-8") as fh:
+            generated = fh.read()
+        gen_rows = [
+            ln for ln in generated.splitlines()
+            if ln.strip().startswith("| `t") and "passes" in ln
+        ]
+        readme = read("README.md")
+        readme_rows = [
+            ln for ln in readme.splitlines()
+            if ln.strip().startswith("| `t") and "**passes**" in ln
+        ]
+        stated = re.search(r"\*\*(\d+) of (\d+)\*\* hold up", readme)
+        problems = []
+        if len(readme_rows) != len(gen_rows):
+            problems.append(f"README shows {len(readme_rows)} rows, refutations.md has {len(gen_rows)}")
+        if stated and int(stated.group(1)) != len(gen_rows):
+            problems.append(f"README claims {stated.group(0)!r} against {len(gen_rows)} generated rows")
+        check(
+            "README's refutation table matches refutations.md",
+            not problems,
+            "; ".join(problems) + ". Regenerate with: python3 evaluation/refutations.py --write",
         )
 
     # --------------------------------------------- this script's own check count

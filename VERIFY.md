@@ -63,7 +63,7 @@ cannot find" in the README.
 | 6 | All 6 checkable claims the baseline made about environments it cleared are false | `python3 evaluation/refutations.py` | Any row reading "claim holds", or a count other than 6 of 6. |
 | 7 | A confirmed verdict ships a working exploit | `./run.sh demo` | An exploit that does not actually pass, or no disagreement shown against the reference. |
 | 8 | It reproduces from a clean clone | See section 5 below | Different numbers from a fresh clone. |
-| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 33 checks, described below. |
+| 9 | **This documentation matches the committed evidence** | `python3 evaluation/check_docs.py` | Anything other than `RESULT: PASS`. 34 checks, described below. |
 
 ### On claim 9, which exists because this project failed it
 
